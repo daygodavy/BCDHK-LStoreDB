@@ -1,5 +1,5 @@
-from template.db import Database
-from template.query import Query
+from db import Database
+from query import Query
 from time import process_time
 from random import choice, randrange
 
