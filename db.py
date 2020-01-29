@@ -1,7 +1,7 @@
-from template.table import Table
+from table import Table
 
 
-class Database():
+class Database:
 
     def __init__(self):
         self.tables = []
