@@ -1,4 +1,4 @@
-from template.table import Table
+from table import Table
 
 """
 # optional: Indexes the specified column of the specified table to speed up select queries
