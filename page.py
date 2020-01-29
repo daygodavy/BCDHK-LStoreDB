@@ -1,5 +1,6 @@
 from config import *
 import struct
+import logging
 
 
 class Page:
@@ -14,11 +15,12 @@ class Page:
         return False
 
     def write(self, value):
+        logging.warning("this worked")
         if self.has_capacity():
+            start = self.num_records * 8
             print("num records in write: " + str(temp.num_records))
             self.num_records += 1
             print("num records in write: " + str(temp.num_records))
-            start = PAGE_SIZE - self.num_records * 8
             self.data[start: start + 8] = struct.pack(">q", value)
             print("success")
         else:
