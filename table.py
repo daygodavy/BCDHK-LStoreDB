@@ -15,12 +15,14 @@ class Record:
         self.key = key
         self.columns = columns
 
+
 class Column:
 
     def __init__(self, table):
         self.index = Index(table=table)
-        self.base_pages = [ Page() ]
-        self.tail_pages = [ Page() ]
+        self.base_pages = [Page()]
+        self.tail_pages = [Page()]
+
 
 class Table:
     """
@@ -57,21 +59,22 @@ class Table:
     """
     Method which instantiates an empty column for each column in the table
     """
+
     def make_columns(self):
         # the data structure which holds the columns
         column_directory = {}
 
         # create a base page and index for each column
-        for i in range(0, self.num_columns-1):
+        for i in range(0, self.num_columns - 1):
             column_directory[i] = Column(table=self)
             column_directory[i].index.create_index(table=self, column_number=i)
 
         return column_directory
 
-
     """
     A method which manages the RIDs of the table
     """
+
     def get_RID_value(self):
         self.num_records += 1
         return self.num_records
@@ -82,12 +85,13 @@ class Table:
     :param key: int         #the index of the primary key column
     :param columns: []      #the column values 
     """
+
     def add_record(self, key, columnValues):
         # add the four bookkeeping columns to the beginning of columnValues
-        columnValues.insert(0, None)
-        columnValues.insert(1, self.get_RID_value())
-        columnValues.insert(2, time())
-        columnValues.insert(3, 0)
+        columnValues.insert(INDIRECTION_COLUMN, None)
+        columnValues.insert(RID_COLUMN, self.get_RID_value())
+        columnValues.insert(TIMESTAMP_COLUMN, time())
+        columnValues.insert(SCHEMA_ENCODING_COLUMN, 0)
 
         # if this primary key already exists within the table then reject the addition of this record
         if self.column_directory[key].index.locate(columnValues[key]):
@@ -101,12 +105,27 @@ class Table:
     def delete_record(self):
         pass
 
-    def update_record(self):
-        pass
+    def update_record(self, key, columns):
+        # TODO: find the record so I can set the indirection column value properly
+        record = self.read_record(key=key, query_columns=[0, 1, 2, 3])
+        # TODO: set schema encoding
+        schema_encoding = None
+        # TODO: get timestamp
+        # TODO: LID?
+        # TODO: set schema encoding of base record
+        # TODO: set indirection in base record
 
-    def read_record(self):
-        pass
+        # add the four bookkeeping columns to the beginning of columns
+        columns.insert(INDIRECTION_COLUMN, None)
+        columns.insert(RID_COLUMN, self.get_RID_value())
+        columns.insert(TIMESTAMP_COLUMN, time())
+        columns.insert(SCHEMA_ENCODING_COLUMN, 0)
+
+        for i, column in self.column_directory:
+            column.update(columns[i])
+
+    def read_record(self, key, query_columns):
+        return Record(rid=None, key=key, columns=query_columns)
 
     def __merge(self):
         pass
-
