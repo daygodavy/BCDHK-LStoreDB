@@ -54,12 +54,14 @@ class Table:
 
         # number of records in the table
         self.num_records = 0
+
+        # tail 2^64 - self.tail_record_tracker = number of tail records
+        self.tail_record_tracker = (2 ** 64)
         pass
 
     """
     Method which instantiates an empty column for each column in the table
     """
-
     def make_columns(self):
         # the data structure which holds the columns
         column_directory = {}
@@ -74,10 +76,16 @@ class Table:
     """
     A method which manages the RIDs of the table
     """
-
     def get_RID_value(self):
         self.num_records += 1
         return self.num_records
+
+    """
+    A method which manages the LIDS of the table
+    """
+    def get_LID_value(self):
+        self.tail_record_tracker -= 1
+        return self.tail_record_tracker
 
     """
     Method which adds a record to the table
@@ -85,7 +93,6 @@ class Table:
     :param key: int         #the index of the primary key column
     :param columns: []      #the column values 
     """
-
     def add_record(self, key, columnValues):
         # add the four bookkeeping columns to the beginning of columnValues
         columnValues.insert(INDIRECTION_COLUMN, None)
@@ -105,24 +112,67 @@ class Table:
     def delete_record(self):
         pass
 
+    """
+    Add an update to a record to the tail pages
+    :param: key: int        # the primary key value of the record we are adding an update for
+    :param columns:         # the column values that are being updated
+    """
     def update_record(self, key, columns):
-        # TODO: find the record so I can set the indirection column value properly
+        # get the base record
         record = self.read_record(key=key, query_columns=[0, 1, 2, 3])
-        # TODO: set schema encoding
-        schema_encoding = None
-        # TODO: get timestamp
-        # TODO: LID?
-        # TODO: set schema encoding of base record
-        # TODO: set indirection in base record
+
+        # get the schema encoding
+        schema_encoding = ''
+        for i in columns:
+            # if value in column is 'None' add 0
+            if columns[i]:
+                schema_encoding = schema_encoding + '0'
+
+            # else add 1
+            else:
+                schema_encoding = schema_encoding + '1'
+
+        schema_encoding = int(schema_encoding, 2)
+
+        # find value for indirection column
+        if record.columns[INDIRECTION_COLUMN]:
+            indirection_value = record.columns[INDIRECTION_COLUMN]
+        else:
+            indirection_value = None
+
+        # get LID value
+        LID = self.get_LID_value()
+
+        # update base record
+        self.update_schema_indirection(key=key, schema_encoding=schema_encoding, indirection_value=LID)
 
         # add the four bookkeeping columns to the beginning of columns
-        columns.insert(INDIRECTION_COLUMN, None)
-        columns.insert(RID_COLUMN, self.get_RID_value())
+        columns.insert(INDIRECTION_COLUMN, indirection_value)
+        columns.insert(RID_COLUMN, LID)
         columns.insert(TIMESTAMP_COLUMN, time())
-        columns.insert(SCHEMA_ENCODING_COLUMN, 0)
+        columns.insert(SCHEMA_ENCODING_COLUMN, schema_encoding)
 
+        # add the tail record column by column
         for i, column in self.column_directory:
             column.update(columns[i])
+
+    """
+    A method which updates the schema and indirection columns of a base record when a tail record is added
+    :param: key: int                                # the primary key value of the record we are adding an update for 
+    :param: schema_encoding: int                    # a value representing which columns have had changes to them
+    :param: indirection_value: int                  # the LID of the tail newest tail record for this base record
+    """
+    def update_schema_indirection(self, key, schema_encoding, indirection_value):
+        # get RID from index
+        RID = self.column_directory[self.key].index.locate(value=key)
+
+        # get page number and offset of record within columns
+        [page_number, offset] = self.page_directory[RID]
+
+        # update the values in the base record
+        self.column_directory[INDIRECTION_COLUMN].base_pages[page_number][offset: offset + 8] = indirection_value
+        self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number][offset: offset + 8] = schema_encoding
+        pass
 
     def read_record(self, key, query_columns):
         return Record(rid=None, key=key, columns=query_columns)
