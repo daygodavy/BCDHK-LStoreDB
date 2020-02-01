@@ -1,6 +1,7 @@
 from table import Table
 import logging
 
+
 class Database:
 
     def __init__(self):
@@ -27,6 +28,7 @@ class Database:
     """
     # Stores the specified table with it's name as the key
     """
+
     def store_table(self, tobj):
         self.tables[tobj.name] = tobj
         print('Successfully stored {} table in Database'.format(self.tables[tobj.name].name))
@@ -34,6 +36,7 @@ class Database:
     """
     # Deletes the specified table
     """
+
     def drop_table(self, name):
         tobj = self.tables.pop(name, 0)
         if tobj == 0:
@@ -41,6 +44,7 @@ class Database:
         else:
             del tobj
             print('{} table dropped'.format(name))
+
 
 db = Database()
 tbl = db.create_table('Users', 2, 0)

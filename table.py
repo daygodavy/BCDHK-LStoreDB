@@ -10,7 +10,7 @@ SCHEMA_ENCODING_COLUMN = 3
 
 class Record:
 
-    def __init__(self, rid, key, columns):
+    def __init__(self, rid, key, *columns):
         self.rid = rid
         self.key = key
         self.columns = columns
@@ -64,7 +64,7 @@ class Table:
     """
     def make_columns(self):
         # the data structure which holds the columns
-        column_directory = {}
+        column_directory = []
 
         # create a base page and index for each column
         for i in range(0, self.num_columns - 1):
@@ -96,7 +96,7 @@ class Table:
     def add_record(self, key, columnValues):
         # add the four bookkeeping columns to the beginning of columnValues
         columnValues.insert(INDIRECTION_COLUMN, None)
-        columnValues.insert(RID_COLUMN, rid)
+        columnValues.insert(RID_COLUMN, self.get_RID_value())
         columnValues.insert(TIMESTAMP_COLUMN, time())
         columnValues.insert(SCHEMA_ENCODING_COLUMN, 0)
 
@@ -109,43 +109,20 @@ class Table:
             for i, column in self.column_directory:
                 column.add(columnValues[i])
 
+    """
+    A method for deleting lazy deletion of a base record
+    :param: key: int                # a primary key value used to find the record
+    """
     def delete_record(self, key):
-        rid = self.index.locate(key)
+        # find the RID by the primary key value
+        rid = self.column_directory[self.key].index.locate(key)
+
+        # find the base page number and offset in byte array for the relevant record
         page_num, offset = self.page_directory[rid]
-        for i in range(0, self.num_columns-1):
-            column_directory[i].base_pages[page_num].data[offset: offset + 8] = 0
 
-
-        # byte_key = struct.pack(">q", key)
-        # key_base_pages = self.column_directory[self.key].base_pages
-        # i = 0
-        # j = 0
-        # match_found = False
-        # match_idx = 0
-        # for pages in key_base_pages:
-        #     if j == len(key_base_pages):
-        #         # key doesn't exist
-        #
-        #         break
-        #     while !match_found:
-        #         curr_byte = pages.data[i + 8]
-        #         if byte_key == curr_byte:
-        #             # match found
-        #             # delete primary key from this page
-        #             match_found = True
-        #             match_idx = i
-        #         else:
-        #             i = i + 8
-        #         if i == 4096:
-        #             break
-        #     j = j + 1
-        #
-        # pages.data[match_idx : match_idx + 8] = 0
-        #
-        # rid_base_pages = self.column_directory[RID_COLUMN].base_pages
-
-
-
+        # for every column set value of record to 0
+        for column in self.column_directory:
+            column.base_pages[page_num].data[offset: offset + 8] = 0
 
     """
     Add an update to a record to the tail pages
@@ -209,15 +186,27 @@ class Table:
         self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number][offset: offset + 8] = schema_encoding
         pass
 
+    """
+    A method which returns a the record with the given primary key
+    :param: key: int                    # the primary key for the wanted record
+    :param: query_columns: []           # a list of integers representing the columns wanted
+    """
     def read_record(self, key, query_columns):
-        list = []
-        rid = self.index.locate(key)
+        # list to hold the wanted column values
+        column_values = []
+
+        # find the RID by the primary key value
+        rid = self.column_directory[self.key].index.locate(key)
+
+        # find the base page number and offset in the byte array for the relevant record
         page_num, offset = self.page_directory[rid]
-        for i in range(0, self.num_columns-1):
-            for j in query_columns:
-                if column_directory[i].index == j:
-                    list.append(column_directory[i].base_pages[page_num].data[offset: offset + 8])
-        return list
+
+        # for every column we want collect it in our column_values list
+        for i, column in self.column_directory:
+            if i in query_columns:
+                column_values.append(column.base_pages[page_num].data[offset: offset + 8])
+        return Record(rid=rid, key=key, columns=column_values)
 
     def __merge(self):
         pass
+
