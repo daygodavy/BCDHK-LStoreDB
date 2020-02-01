@@ -17,50 +17,36 @@ class Query:
     # internal Method
     # Read a record with specified RID
     """
+
     def delete(self, key):
-        pass
+        self.table.delete_record(key)
 
     """
     # Insert a record with specified columns
     """
+
     def insert(self, *columns):
-        schema_encoding = '0' * self.table.num_columns
-        indirection = nil
-        ts = time.gmtime()
-        formattedTime = time.strftime("%x %X", ts)
-        print(time.strftime("%x %X", ts))
-        # 01/31/20 23:47:30
-        StartRID = StartRID + 1
-        index = 3
-        for column in columns:
-            index = index + 1
-            # page offsetting
-            page[index].append(column)
-
-        lhlil
-        
-
-
-        # *columns is a record repretsented as an array, each element to
-        # its own column
-        pass
+        self.table.add_record(columns)
 
     """
     # Read a record with specified key
     """
+
     def select(self, key, query_columns):
-        pass
+        self.table.read_record(key, query_columns)
 
     """
     # Update a record with specified key and columns
     """
+
     def update(self, key, *columns):
-        pass
+        self.table.update_record(key, columns)
 
     """
     :param start_range: int         # Start of the key range to aggregate
     :param end_range: int           # End of the key range to aggregate
     :param aggregate_columns: int  # Index of desired column to aggregate
     """
+
     def sum(self, start_range, end_range, aggregate_column_index):
         pass
