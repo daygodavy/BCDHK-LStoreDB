@@ -1,4 +1,5 @@
 from config import *
+from table import *
 import struct
 import logging
 
