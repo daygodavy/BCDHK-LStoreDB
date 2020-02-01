@@ -1,5 +1,7 @@
 from table import Table, Record
 from index import Index
+import time
+import datetime
 
 
 class Query:
@@ -16,26 +18,44 @@ class Query:
     # Read a record with specified RID
     """
     def delete(self, key):
-        self.table.delete_record(key)
-
+        pass
 
     """
     # Insert a record with specified columns
     """
     def insert(self, *columns):
-        self.table.add_record(columns)
+        schema_encoding = '0' * self.table.num_columns
+        indirection = nil
+        ts = time.gmtime()
+        formattedTime = time.strftime("%x %X", ts)
+        print(time.strftime("%x %X", ts))
+        # 01/31/20 23:47:30
+        StartRID = StartRID + 1
+        index = 3
+        for column in columns:
+            index = index + 1
+            # page offsetting
+            page[index].append(column)
+
+        lhlil
+        
+
+
+        # *columns is a record repretsented as an array, each element to
+        # its own column
+        pass
 
     """
     # Read a record with specified key
     """
     def select(self, key, query_columns):
-        self.table.read_record(key, query_columns)
+        pass
 
     """
     # Update a record with specified key and columns
     """
     def update(self, key, *columns):
-        self.table.update_record(key, columns)
+        pass
 
     """
     :param start_range: int         # Start of the key range to aggregate
