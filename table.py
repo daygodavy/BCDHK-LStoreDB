@@ -23,6 +23,22 @@ class Column:
         self.base_pages = [Page()]
         self.tail_pages = [Page()]
 
+    '''
+    Adding a new data entry to the column.
+    Using update means that there already existed a base record, so this
+    new value will be added to a tail_page
+    '''
+    def update(value):
+        #get the most recent page
+        current_page = self.tail_pages[-1]
+        #if the current page is full, create a new page
+        if not current_page.has_capacity():
+            current_page = Page()
+            #appending new page to the tail_pages array of that column
+            self.tail_pages.append(current_page)
+
+        current_page.write(value)
+        print("Record updated")
 
 class Table:
     """
@@ -42,9 +58,8 @@ class Table:
         # the number is augmented by four for the book keeping columns
         self.num_columns = num_columns + 4
 
-        # A dictionary of the columns
-        # key: is column number
-        # value: first base page, index for column
+        # An array of the columns where index is column number
+        # Each element in the array represents a column in the table
         # columns 0-3 are bookkeeping
         # the rest of the columns are the user columns
         self.column_directory = self.make_columns()
@@ -69,8 +84,7 @@ class Table:
         # create a base page and index for each column
         for i in range(0, self.num_columns - 1):
             column_directory[i] = Column(table=self)
-            column_directory[i].index.create_index(table=self, column_number=i)
-
+            column_directory[i].index.create_index(table=self, column_number=i)\\
         return column_directory
 
     """
@@ -136,21 +150,22 @@ class Table:
         # get the schema encoding
         schema_encoding = ''
         for i in columns:
-            # if value in column is 'None' add 0
+            # if value in column is not 'None' add 1qwe
             if columns[i]:
-                schema_encoding = schema_encoding + '0'
+                schema_encoding = schema_encoding + '1'
 
             # else add 1
             else:
-                schema_encoding = schema_encoding + '1'
+                schema_encoding = schema_encoding + '0'
 
         schema_encoding = int(schema_encoding, 2)
 
         # find value for indirection column
+        indirection_value = None #initialize
         if record.columns[INDIRECTION_COLUMN]:
             indirection_value = record.columns[INDIRECTION_COLUMN]
-        else:
-            indirection_value = None
+        # else:
+        #     indirection_value = None
 
         # get LID value
         LID = self.get_LID_value()
@@ -170,7 +185,7 @@ class Table:
 
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
-    :param: key: int                                # the primary key value of the record we are adding an update for 
+    :param: key: int                                # the primary key value of the record we are adding an update for
     :param: schema_encoding: int                    # a value representing which columns have had changes to them
     :param: indirection_value: int                  # the LID of the tail newest tail record for this base record
     """
@@ -184,7 +199,6 @@ class Table:
         # update the values in the base record
         self.column_directory[INDIRECTION_COLUMN].base_pages[page_number][offset: offset + 8] = indirection_value
         self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number][offset: offset + 8] = schema_encoding
-        pass
 
     """
     A method which returns a the record with the given primary key
@@ -209,4 +223,3 @@ class Table:
 
     def __merge(self):
         pass
-
