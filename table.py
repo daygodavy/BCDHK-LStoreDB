@@ -145,7 +145,7 @@ class Table:
     """
     def update_record(self, key, columns):
         # get the base record
-        record = self.read_record(key=key, query_columns=[0, 1, 2, 3])
+        record = self.read_record(key=key, query_columns=[x for x in range(0, len(columns) + 4)])
 
         # get the schema encoding
         schema_encoding = ''
@@ -161,11 +161,21 @@ class Table:
         schema_encoding = int(schema_encoding, 2)
 
         # find value for indirection column
-        indirection_value = None #initialize
-        if record.columns[INDIRECTION_COLUMN]:
-            indirection_value = record.columns[INDIRECTION_COLUMN]
-        # else:
-        #     indirection_value = None
+        # indirection_value = None #initialize
+        # if record.columns[INDIRECTION_COLUMN]:
+        #     indirection_value = record.columns[INDIRECTION_COLUMN]
+
+        # Find the RID/LID of the latest record
+        latest_rec_vals = None
+        if record.columns[INDIRECTION_COLUMN]: #latest is a tail record
+            id = record.columns[INDIRECTION_COLUMN]
+            page_num, offset = self.page_directory[id]
+
+            # for every column we want collect it in our column_values list
+            for i, column in self.column_directory:
+                latest_rec_vals.append(column.base_pages[page_num].data[offset: offset + 8])
+        else: #latest record is base record
+            latest_rec_vals = record.columns
 
         # get LID value
         LID = self.get_LID_value()
@@ -174,15 +184,19 @@ class Table:
         self.update_schema_indirection(key=key, schema_encoding=schema_encoding, indirection_value=LID)
 
         # add the four bookkeeping columns to the beginning of columns
-        columns.insert(INDIRECTION_COLUMN, indirection_value)
+        columns.insert(INDIRECTION_COLUMN, None)
         columns.insert(RID_COLUMN, LID)
         columns.insert(TIMESTAMP_COLUMN, time())
         columns.insert(SCHEMA_ENCODING_COLUMN, schema_encoding)
 
         # add the tail record column by column
-        for i, column in self.column_directory:
-            column.update(columns[i])
-
+        self.column_directory[INDIRECTION_COLUMN].update(columns[INDIRECTION_COLUMN])
+        for i in range(1, len(self.column_directory)):
+            if columns[i]:
+                self.column_directory[i].update(columns[i])
+            else:
+                self.column_directory[i].update(latest_rec_vals[i])
+                
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
     :param: key: int                                # the primary key value of the record we are adding an update for
