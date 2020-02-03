@@ -23,6 +23,12 @@ class Column:
         self.base_pages = [Page()]
         self.tail_pages = [Page()]
 
+    def add(self, col_val):
+        if not self.base_pages[-1].has_capacity():
+            self.base_pages.append(Page())
+
+        self.base_pages[-1].write(col_val)
+
 
 class Table:
     """
@@ -170,7 +176,7 @@ class Table:
 
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
-    :param: key: int                                # the primary key value of the record we are adding an update for 
+    :param: key: int                                # the primary key value of the record we are adding an update for
     :param: schema_encoding: int                    # a value representing which columns have had changes to them
     :param: indirection_value: int                  # the LID of the tail newest tail record for this base record
     """
@@ -209,4 +215,3 @@ class Table:
 
     def __merge(self):
         pass
-
