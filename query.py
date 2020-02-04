@@ -8,7 +8,6 @@ class Query:
     """
     # Creates a Query object that can perform different queries on the specified table
     """
-
     def __init__(self, table):
         self.table = table
         pass
@@ -17,28 +16,24 @@ class Query:
     # internal Method
     # Read a record with specified RID
     """
-
     def delete(self, key):
         self.table.delete_record(key)
 
     """
     # Insert a record with specified columns
     """
-
     def insert(self, *columns):
         self.table.add_record(columns)
 
     """
     # Read a record with specified key
     """
-
     def select(self, key, query_columns):
         self.table.read_record(key, query_columns)
 
     """
     # Update a record with specified key and columns
     """
-
     def update(self, key, *columns):
         self.table.update_record(key, columns)
 
@@ -47,6 +42,5 @@ class Query:
     :param end_range: int           # End of the key range to aggregate
     :param aggregate_columns: int  # Index of desired column to aggregate
     """
-
     def sum(self, start_range, end_range, aggregate_column_index):
         pass

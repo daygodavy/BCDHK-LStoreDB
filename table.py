@@ -9,7 +9,9 @@ SCHEMA_ENCODING_COLUMN = 3
 
 
 class Record:
-    def __init__(self, rid, key, *columns):
+
+    def __init__(self, rid, key, columns):
+
         self.rid = rid
         self.key = key
         self.columns = columns
@@ -17,8 +19,8 @@ class Record:
 
 class Column:
 
-    def __init__(self, table):
-        self.index = Index(table=table)
+    def __init__(self):
+        self.index = None
         self.base_pages = [Page()]
         self.tail_pages = [Page()]
 
@@ -82,8 +84,8 @@ class Table:
 
         # create a base page and index for each column
         for i in range(0, self.num_columns - 1):
-            column_directory[i] = Column(table=self)
-            column_directory[i].index.create_index(table=self, column_number=i)
+            column_directory[i] = Column()
+            
         return column_directory
 
     """
@@ -121,6 +123,8 @@ class Table:
         else:
             for i, column in self.column_directory:
                 column.add(columnValues[i])
+                if column.index:
+                    column.index.add_index(columnValues[i])
 
     """
     A method for deleting lazy deletion of a base record
@@ -209,12 +213,17 @@ class Table:
 
     """
     A method which returns a the record with the given primary key
-    :param: key: int                    # the primary key for the wanted record
+    :param: key: int                    # value of the primary key we are looking for
     :param: query_columns: []           # a list of integers representing the columns wanted
     """
     def read_record(self, key, query_columns):
         # list to hold the wanted column values
         column_values = []
+
+        # if there is no index for this column yet, create it
+        if not self.column_directory[self.key].index:
+            self.column_directory[self.key].index = Index(table=self, column_number=self.key)
+            self.column_directory[self.key].index.create_index()
 
         # find the RID by the primary key value
         rid = self.column_directory[self.key].index.locate(key)
@@ -224,8 +233,9 @@ class Table:
 
         # for every column we want collect it in our column_values list
         for i, column in self.column_directory:
-            if i in query_columns:
+            if query_columns[i]:
                 column_values.append(column.base_pages[page_num].data[offset: offset + 8])
+
         return Record(rid=rid, key=key, columns=column_values)
 
     def __merge(self):
