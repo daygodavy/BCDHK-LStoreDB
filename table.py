@@ -83,12 +83,6 @@ class Table:
         self.tail_record_tracker = (2 ** 64)
         pass
 
-    # '''
-    # Method which initialize the page directory as B+ tree
-    # '''
-    # def init_page_directory(self):
-    #     return BPlusTree(order=10, key_size = 24)
-
     """
     Method which instantiates an empty column for each column in the table
     """
@@ -127,10 +121,6 @@ class Table:
 
         #TODO: cannot just convert time to int
         col_vals = [0, rid, int(time()), 0]
-        # columnValues.insert(INDIRECTION_COLUMN, None)
-        # columnValues.insert(RID_COLUMN, rid)
-        # columnValues.insert(TIMESTAMP_COLUMN, time())
-        # columnValues.insert(SCHEMA_ENCODING_COLUMN, 0)
 
         for item in columnValues:
             col_vals.append(item)
@@ -200,7 +190,7 @@ class Table:
         #update indirection column of base record
         self.update_schema_indirection(key, schema_encoding, LID)
 
-        #find the latest tail record
+        #find the latest record
         if tail_record: #latest is a tail record
             tail_page_num, tail_offset = self.page_directory.get(tail_record.rid)
             # update the values in the tail record
@@ -208,18 +198,17 @@ class Table:
 
             # for every column we want collect it in our column_values list
             for i in range(4, len(columns) + 4):
-                if not col_vals[i]:
+                if col_vals[i] == None:
                     col_vals[i] = struct.unpack(ENCODING, tail_record.columns[i])[0]
         else: #latest record is base record
             for i in range(4, len(columns) + 4):
-                if not col_vals[i]:
+                if col_vals[i] == None:
                     col_vals[i] = struct.unpack(ENCODING, base_record.columns[i])[0]
 
         page_num = offset = -1
         for i in range(0, len(col_vals)):
             page_num, offset = self.column_directory[i].update(col_vals[i])
         self.page_directory.update({LID : [page_num, offset]})
-        #self.column_directory[INDIRECTION_COLUMN].update([page_num, offset])
 
 
     """
