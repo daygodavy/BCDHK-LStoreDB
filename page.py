@@ -31,6 +31,7 @@ class Page:
             print("num records in write: " + str(temp.num_records))
             self.data[start: start + 8] = struct.pack(ENCODING, value)
             print("success")
+            return start
         else:
             return print("page full")
 

@@ -11,7 +11,6 @@ SCHEMA_ENCODING_COLUMN = 3
 class Record:
 
     def __init__(self, rid, key, columns):
-
         self.rid = rid
         self.key = key
         self.columns = columns
@@ -23,6 +22,15 @@ class Column:
         self.index = None
         self.base_pages = [Page()]
         self.tail_pages = [Page()]
+
+     def add(self, col_val):
+        if  not self.base_pages[-1].has_capacity():
+            self.base_pages.append(Page())
+
+        offset = self.base_pages[-1].write(col_val)
+
+        #returning the page number and offset of new base record
+        return len(self.base_pages) - 1, offset
 
     '''
     Adding a new data entry to the column.
@@ -75,6 +83,12 @@ class Table:
         self.tail_record_tracker = (2 ** 64)
         pass
 
+     '''
+    Method which initialize the page directory as B+ tree
+    '''
+    def init_page_directory(self):
+        return BPlusTree(order=10, key_size = 24)
+
     """
     Method which instantiates an empty column for each column in the table
     """
@@ -85,7 +99,7 @@ class Table:
         # create a base page and index for each column
         for i in range(0, self.num_columns - 1):
             column_directory[i] = Column()
-            
+
         return column_directory
 
     """
@@ -104,14 +118,14 @@ class Table:
 
     """
     Method which adds a record to the table
-
     :param key: int         #the index of the primary key column
     :param columns: []      #the column values
     """
     def add_record(self, key, columnValues):
         # add the four bookkeeping columns to the beginning of columnValues
+        rid = self.get_RID_value()
         columnValues.insert(INDIRECTION_COLUMN, None)
-        columnValues.insert(RID_COLUMN, self.get_RID_value())
+        columnValues.insert(RID_COLUMN, rid)
         columnValues.insert(TIMESTAMP_COLUMN, time())
         columnValues.insert(SCHEMA_ENCODING_COLUMN, 0)
 
@@ -121,10 +135,11 @@ class Table:
 
         # otherwise for each column in the table add the value
         else:
-            for i, column in self.column_directory:
-                column.add(columnValues[i])
+            for i in range(0, len(self.column_directory)):
+                page_num, offset = self.column_directory[i].add(columnValues[i])
                 if column.index:
                     column.index.add_index(columnValues[i])
+            self.page_directory.insert(rid, [page_num, offset])
 
     """
     A method for deleting lazy deletion of a base record
