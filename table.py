@@ -171,7 +171,7 @@ class Table:
     """
     def update_record(self, key, columns):
         # get the base record
-        record = self.read_record(key=key, query_columns=[x for x in range(0, len(columns) + 4)])
+        record = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
 
         # get the schema encoding
         schema_encoding = ''
@@ -219,7 +219,7 @@ class Table:
 
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
-    :param key: int                                # the primary key value of the record we are adding an update for 
+    :param key: int                                # the primary key value of the record we are adding an update for
     :param schema_encoding: int                    # a value representing which columns have had changes to them
     :param indirection_value: int                  # the LID of the tail newest tail record for this base record
     """
