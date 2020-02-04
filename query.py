@@ -23,7 +23,7 @@ class Query:
     # Insert a record with specified columns
     """
     def insert(self, *columns):
-        self.table.add_record(columns)
+        self.table.add_record(*columns)
 
     """
     # Read a record with specified key

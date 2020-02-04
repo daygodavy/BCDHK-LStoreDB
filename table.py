@@ -1,6 +1,7 @@
 from page import Page
 from time import time
 from index import Index
+from BTress.OOBTree import OOBTree
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
@@ -61,7 +62,7 @@ class Table:
         self.name = name
 
         # column number of primary key
-        self.key = key
+        self.key = key + 4
 
         # number of columns in the table
         # the number is augmented by four for the book keeping columns
@@ -74,7 +75,7 @@ class Table:
         self.column_directory = self.make_columns()
 
         # page directory accepts RID and returns page# and offset of record
-        self.page_directory = {}
+        self.page_directory = OOBTree()
 
         # number of records in the table
         self.num_records = 0
@@ -83,11 +84,11 @@ class Table:
         self.tail_record_tracker = (2 ** 64)
         pass
 
-    '''
-    Method which initialize the page directory as B+ tree
-    '''
-    def init_page_directory(self):
-        return BPlusTree(order=10, key_size = 24)
+    # '''
+    # Method which initialize the page directory as B+ tree
+    # '''
+    # def init_page_directory(self):
+    #     return BPlusTree(order=10, key_size = 24)
 
     """
     Method which instantiates an empty column for each column in the table
@@ -121,25 +122,30 @@ class Table:
     :param key: int         #the index of the primary key column
     :param columns: []      #the column values
     """
-    def add_record(self, columnValues):
+    def add_record(self, *columnValues):
         # add the four bookkeeping columns to the beginning of columnValues
         rid = self.get_RID_value()
-        columnValues.insert(INDIRECTION_COLUMN, None)
-        columnValues.insert(RID_COLUMN, rid)
-        columnValues.insert(TIMESTAMP_COLUMN, time())
-        columnValues.insert(SCHEMA_ENCODING_COLUMN, 0)
+        col_vals = [0, rid, int(time()), 0]
+        # columnValues.insert(INDIRECTION_COLUMN, None)
+        # columnValues.insert(RID_COLUMN, rid)
+        # columnValues.insert(TIMESTAMP_COLUMN, time())
+        # columnValues.insert(SCHEMA_ENCODING_COLUMN, 0)
+
+        for item in columnValues:
+            col_vals.append(item)
 
         # if this primary key already exists within the table then reject the addition of this record
-        if self.column_directory[self.key].index.locate(columnValues[self.key]):
+        index = self.column_directory[self.key].index
+        if index and index.locate(col_vals[self.key]):
             return "ERROR: this primary key already exists within the table"
 
         # otherwise for each column in the table add the value
         else:
             for i in range(0, len(self.column_directory)):
-                page_num, offset = self.column_directory[i].add(columnValues[i])
-                if column.index:
-                    column.index.add_index(columnValues[i])
-            self.page_directory.insert(rid, [page_num, offset])
+                page_num, offset = self.column_directory[i].add(col_vals[i])
+                if self.column_directory[i].index:
+                    column.index.add_index(col_vals[i])
+            self.page_directory.update({rid : [page_num, offset]})
 
         # increment num of records
         self.num_records += 1
@@ -155,7 +161,7 @@ class Table:
             return "ERROR: key does not exist"
 
         # find the base page number and offset in byte array for the relevant record
-        page_num, offset = self.page_directory[rid]
+        page_num, offset = self.page_directory.get(rid)
 
         # for every column set value of record to 0
         for column in self.column_directory:
@@ -191,7 +197,7 @@ class Table:
         id = record.rid
         if record.columns[INDIRECTION_COLUMN]: #latest is a tail record
             id = record.columns[INDIRECTION_COLUMN]
-            page_num, offset = self.page_directory[id]
+            page_num, offset = self.page_directory.get(id)
             # for every column we want collect it in our column_values list
             for i, column in self.column_directory:
                 latest_rec_vals.append(column.base_pages[page_num].data[offset: offset + 8])
@@ -228,7 +234,7 @@ class Table:
         RID = self.column_directory[self.key].index.locate(value=key)
 
         # get page number and offset of record within columns
-        [page_number, offset] = self.page_directory[RID]
+        [page_number, offset] = self.page_directory.get(RID)
 
         # update the values in the base record
         self.column_directory[INDIRECTION_COLUMN].base_pages[page_number][offset: offset + 8] = indirection_value
@@ -254,7 +260,7 @@ class Table:
         # if key was located
         if rid is not None:
             # find the base page number and offset in the byte array for the relevant record
-            page_num, offset = self.page_directory[rid]
+            page_num, offset = self.page_directory.get(rid)
 
             # for every column we want collect it in our column_values list
             for i, column in self.column_directory:

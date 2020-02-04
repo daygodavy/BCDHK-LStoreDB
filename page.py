@@ -26,9 +26,9 @@ class Page:
         logging.warning("this worked")
         if self.has_capacity():
             start = self.num_records * 8
-            print("num records in write: " + str(temp.num_records))
+            print("num records in write: " + str(self.num_records))
             self.num_records += 1
-            print("num records in write: " + str(temp.num_records))
+            print("num records in write: " + str(self.num_records))
             self.data[start: start + 8] = struct.pack(ENCODING, value)
             print("success")
             return start
