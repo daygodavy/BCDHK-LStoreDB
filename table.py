@@ -41,17 +41,12 @@ class Column:
     new value will be added to a tail_page
     '''
     def update(self, value):
-        #get the most recent page
-        current_page = self.tail_pages[-1]
         #if the current page is full, create a new page
-        if not current_page.has_capacity():
-            current_page = Page()
+        if not self.tail_pages[-1].has_capacity():
             #appending new page to the tail_pages array of that column
-            self.tail_pages.append(current_page)
+            self.tail_pages.append(Page())
 
-        print(value)
-        offset = current_page.write(value)
-        print("Record updated")
+        offset = self.tail_pages[-1].write(value)
         return len(self.tail_pages) - 1, offset
 
 class Table:
@@ -70,7 +65,7 @@ class Table:
 
         # number of columns in the table
         # the number is augmented by four for the book keeping columns
-        self.num_columns = num_columns + 4
+        self.num_columns = num_columns
 
         # An array of the columns where index is column number
         # Each element in the array represents a column in the table
@@ -102,7 +97,7 @@ class Table:
         column_directory = []
 
         # create a base page and index for each column
-        for i in range(0, self.num_columns):
+        for i in range(0, self.num_columns+4):
             column_directory.append(Column())
 
         return column_directory
@@ -179,68 +174,49 @@ class Table:
     :param columns:         # the column values that are being updated
     """
     def update_record(self, key, columns):
-        # get the base record
-        record = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
-        col_vals = []
+        # get LID value
+        LID = self.get_LID_value()
 
-        # get the schema encoding
+        # get the base record
+        base_record, tail_record = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
+        col_vals = [0]*(len(columns) + 4)
+        col_vals[TIMESTAMP_COLUMN] = int(time())
+        col_vals[RID_COLUMN] = LID
+        col_vals[INDIRECTION_COLUMN] = base_record.rid
+
         schema_encoding = ''
         for i in range (0, len(columns)):
-            col_vals.append(columns[i])
+            col_vals[i+4] = columns[i]
             # if value in column is not 'None' add 1
             if columns[i]:
                 schema_encoding = schema_encoding + '1'
             # else add 0
             else:
                 schema_encoding = schema_encoding + '0'
-
+        print("col_vals after changing", col_vals)
         schema_encoding = int(schema_encoding, 2)
+        col_vals[SCHEMA_ENCODING_COLUMN] = schema_encoding
 
-        # Find the RID/LID of the latest record
-        latest_rec_vals = []
-        # for indirection column
-        id = record.rid
-        indirection = struct.unpack(ENCODING, record.columns[INDIRECTION_COLUMN])[0]
-        if indirection != 0: #latest is a tail record
-            id = indirection
-            page_num, offset = self.page_directory.get(id)
+        #find the latest tail record
+        if tail_record: #latest is a tail record
             # for every column we want collect it in our column_values list
-            for column in self.column_directory[4:]:
-                print("===", struct.unpack(ENCODING, column.tail_pages[page_num].read(offset)))
-                latest_rec_vals.append(struct.unpack(ENCODING, column.tail_pages[page_num].read(offset))[0])
+            print("tail", tail_record.columns)
+            for i in range(4, len(columns) + 4):
+                if not col_vals[i]:
+                    col_vals[i] = struct.unpack(ENCODING, tail_record.columns[i])[0]
         else: #latest record is base record
-            latest_rec_vals = [struct.unpack(ENCODING, x)[0] for x in record.columns[4:]]
+            for i in range(4, len(columns) + 4):
+                if not col_vals[i]:
+                    # print("===", struct.unpack(ENCODING, column.tail_pages[page_num].read(offset)))
+                    col_vals[i] = struct.unpack(ENCODING, base_record.columns[i])[0]
 
-        # get LID value
-        LID = self.get_LID_value()
-
-        # update base record
-        self.update_schema_indirection(key=key, schema_encoding=schema_encoding, indirection_value=LID)
-
-        # add the four bookkeeping columns to the beginning of columns
-        col_vals = [id, LID, int(time()), schema_encoding]
-        for item in columns:
-            col_vals.append(item)
-        # .insert(INDIRECTION_COLUMN, id)
-        # col_vals.insert(RID_COLUMN, LID)
-        # col_vals.insert(TIMESTAMP_COLUMN, int(time()))
-        # col_vals.insert(SCHEMA_ENCODING_COLUMN, schema_encoding)
-
-        # add the tail record column by column
-        page_num = offset = 0
-        for i in range(0, 4):
-            print("updating column", i)
+        page_num = offset = -1
+        print("Col vals after everything is appended", col_vals)
+        for i in range(0, len(col_vals)):
             page_num, offset = self.column_directory[i].update(col_vals[i])
-
-        for i in range(0, len(latest_rec_vals)):
-            print("updating column", i+4)
-            if col_vals[i+4]:
-                print("In col_vals", col_vals[i+4])
-                page_num, offset = self.column_directory[i+4].update(col_vals[i+4])
-            else:
-                print("In latest_rec_vals", latest_rec_vals[i])
-                page_num, offset = self.column_directory[i+4].update(latest_rec_vals[i])
         self.page_directory.update({LID : [page_num, offset]})
+        #self.column_directory[INDIRECTION_COLUMN].update([page_num, offset])
+
 
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
@@ -267,7 +243,9 @@ class Table:
     def read_record(self, key, query_columns):
         # list to hold the wanted column values
         column_values = []
-
+        base_record = None
+        tail_record = None
+        #print("Here")
         # if there is no index for this column yet, create it
         if not self.column_directory[self.key].index:
             self.column_directory[self.key].index = Index(table=self, column_number=self.key)
@@ -279,27 +257,28 @@ class Table:
         # if key was located
         if rid != 0:
             # find the base page number and offset in the byte array for the relevant record
-            page_num, offset = self.page_directory.get(rid)
-
-            lid = struct.unpack(ENCODING, self.column_directory[INDIRECTION_COLUMN].base_pages[page_num].read(offset))[0]
+            base_page_num, base_offset = self.page_directory.get(rid)
+            lid = struct.unpack(ENCODING, self.column_directory[INDIRECTION_COLUMN].base_pages[base_page_num].read(base_offset))[0]
             if lid != 0:
-                rid = lid
-                page_num, offset = self.page_directory.get(lid)
-                for i in range(0, len(self.column_directory)):
-                    if self.column_directory[i]:
-                        column_values.append(self.column_directory[i].tail_pages[page_num].read(offset))
+                tail_page_num, tail_offset = self.page_directory.get(lid)
+                for i in range(len(self.column_directory)):
+                    if query_columns[i]:
+                        column_values.append(self.column_directory[i].tail_pages[tail_page_num].read(tail_offset))
+                tail_record = Record(rid=column_values[RID_COLUMN], key=key, columns=column_values)
             # for every column we want collect it in our column_values list
-            else:
-                for i in range(0, len(self.column_directory)):
-                    if self.column_directory[i]:
-                        column_values.append(self.column_directory[i].base_pages[page_num].read(offset))
+            column_values = []
+            for i in range(len(self.column_directory)):
+                if query_columns[i]:
+                    column_values.append(self.column_directory[i].base_pages[base_page_num].read(base_offset))
+                # print(struct.unpack(ENCODING, self.column_directory[i].base_pages[base_page_num].read(base_offset)))
+            base_record = Record(rid=rid, key=key, columns=column_values)
 
         # for every column we want collect it in our column_values list
         # for i, column in self.column_directory:
         #     if query_columns[i]:
         #         column_values.append(column.base_pages[page_num].data[offset: offset + 8])
 
-        return Record(rid=rid, key=key, columns=column_values)
+        return base_record, tail_record
 
     """
     A method which returns a the record with the given primary key

@@ -28,6 +28,7 @@ for i in range(0, 1000):
 for key in records:
     record = query.select(key, [1, 1, 1, 1, 1])#[0]
     error = False
+
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
             error = True
@@ -44,8 +45,11 @@ for key in records:
         original = records[key].copy()
         records[key][i] = value
         query.update(key, *updated_columns)
-        record = query.select(key, [1, 1, 1, 1, 1])[0]
+        record = query.select(key, [1, 1, 1, 1, 1])#[0]
         error = False
+
+        print("Result", record.columns)
+        print("Expected", records[key])
         for j, column in enumerate(record.columns):
             if column != records[key][j]:
                 error = True
