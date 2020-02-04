@@ -43,4 +43,4 @@ class Query:
     :param aggregate_columns: int  # Index of desired column to aggregate
     """
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        self.table.sum_records(start_range, end_range, aggregate_column_index)

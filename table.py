@@ -130,7 +130,7 @@ class Table:
         columnValues.insert(SCHEMA_ENCODING_COLUMN, 0)
 
         # if this primary key already exists within the table then reject the addition of this record
-        if self.column_directory[key].index.locate(columnValues[key]):
+        if self.column_directory[self.key].index.locate(columnValues[key]):
             return "ERROR: this primary key already exists within the table"
 
         # otherwise for each column in the table add the value
@@ -141,6 +141,9 @@ class Table:
                     column.index.add_index(columnValues[i])
             self.page_directory.insert(rid, [page_num, offset])
 
+        # increment num of records
+        self.num_records += 1
+
     """
     A method for deleting lazy deletion of a base record
     :param: key: int                # a primary key value used to find the record
@@ -148,6 +151,8 @@ class Table:
     def delete_record(self, key):
         # find the RID by the primary key value
         rid = self.column_directory[self.key].index.locate(key)
+        if rid is None:
+            return "ERROR: key does not exist"
 
         # find the base page number and offset in byte array for the relevant record
         page_num, offset = self.page_directory[rid]
@@ -156,9 +161,12 @@ class Table:
         for column in self.column_directory:
             column.base_pages[page_num].data[offset: offset + 8] = 0
 
+        # decrement num of records
+        self.num_records -= 1
+
     """
     Add an update to a record to the tail pages
-    :param: key: int        # the primary key value of the record we are adding an update for
+    :param key: int        # the primary key value of the record we are adding an update for
     :param columns:         # the column values that are being updated
     """
     def update_record(self, key, columns):
@@ -211,9 +219,9 @@ class Table:
 
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
-    :param: key: int                                # the primary key value of the record we are adding an update for
-    :param: schema_encoding: int                    # a value representing which columns have had changes to them
-    :param: indirection_value: int                  # the LID of the tail newest tail record for this base record
+    :param key: int                                # the primary key value of the record we are adding an update for 
+    :param schema_encoding: int                    # a value representing which columns have had changes to them
+    :param indirection_value: int                  # the LID of the tail newest tail record for this base record
     """
     def update_schema_indirection(self, key, schema_encoding, indirection_value):
         # get RID from index
@@ -228,8 +236,8 @@ class Table:
 
     """
     A method which returns a the record with the given primary key
-    :param: key: int                    # value of the primary key we are looking for
-    :param: query_columns: []           # a list of integers representing the columns wanted
+    :param key: int                    # the primary key for the wanted record
+    :param query_columns: []           # a list of integers representing the columns wanted
     """
     def read_record(self, key, query_columns):
         # list to hold the wanted column values
@@ -243,8 +251,15 @@ class Table:
         # find the RID by the primary key value
         rid = self.column_directory[self.key].index.locate(key)
 
-        # find the base page number and offset in the byte array for the relevant record
-        page_num, offset = self.page_directory[rid]
+        # if key was located
+        if rid is not None:
+            # find the base page number and offset in the byte array for the relevant record
+            page_num, offset = self.page_directory[rid]
+
+            # for every column we want collect it in our column_values list
+            for i, column in self.column_directory:
+                if query_columns[i]:
+                    column_values.append(column.base_pages[page_num].data[offset: offset + 8])
 
         # for every column we want collect it in our column_values list
         for i, column in self.column_directory:
@@ -252,6 +267,26 @@ class Table:
                 column_values.append(column.base_pages[page_num].data[offset: offset + 8])
 
         return Record(rid=rid, key=key, columns=column_values)
+
+    """
+    A method which returns a the record with the given primary key
+    :param start_range: int            # start of key range
+    :param end_range: int              # end of key range (inclusive)
+    :param aggr_column_index: int      # index of column to aggregate
+    """
+    def sum_records(self, start_range, end_range, aggr_column_index):
+        sum_col = 0
+        if end_range - start_range <= 0:
+            return "ERROR: invalid range"
+
+        # go through keys within range
+        for key_in_range in range(start_range, end_range + 1):
+            # read_record to get back column to aggregate
+            aggr_record = self.read_record(key_in_range, [aggr_column_index])
+            # if key exists, sum
+            if aggr_record.rid is None:
+                sum_col += aggr_record.columns[0]
+        return sum_col
 
     def __merge(self):
         pass
