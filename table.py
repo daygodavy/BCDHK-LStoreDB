@@ -202,6 +202,10 @@ class Table:
 
         #find the latest tail record
         if tail_record: #latest is a tail record
+            tail_page_num, tail_offset = self.page_directory.get(tail_record.rid)
+            # update the values in the tail record
+            self.column_directory[INDIRECTION_COLUMN].tail_pages[tail_page_num].data[tail_offset: tail_offset + 8] = struct.pack(ENCODING, LID)
+
             # for every column we want collect it in our column_values list
             for i in range(4, len(columns) + 4):
                 if not col_vals[i]:
@@ -251,10 +255,12 @@ class Table:
             self.column_directory[self.key].index.create_index()
 
         # find the RID by the primary key value
-        rid = self.column_directory[self.key].index.locate(key)[0]
+        rid = self.column_directory[self.key].index.locate(key)
+        if rid:
+            rid = rid[0]
 
         # if key was located
-        if rid != 0:
+        if rid and rid != 0:
             # find the base page number and offset in the byte array for the relevant record
             base_page_num, base_offset = self.page_directory.get(rid)
             lid = struct.unpack(ENCODING, self.column_directory[INDIRECTION_COLUMN].base_pages[base_page_num].read(base_offset))[0]
@@ -263,7 +269,7 @@ class Table:
                 for i in range(len(self.column_directory)):
                     if query_columns[i]:
                         column_values.append(self.column_directory[i].tail_pages[tail_page_num].read(tail_offset))
-                tail_record = Record(rid=column_values[RID_COLUMN], key=key, columns=column_values)
+                tail_record = Record(rid=lid, key=key, columns=column_values)
             # for every column we want collect it in our column_values list
             column_values = []
             for i in range(len(self.column_directory)):
@@ -281,16 +287,20 @@ class Table:
     """
     def sum_records(self, start_range, end_range, aggr_column_index):
         sum_col = 0
+        print(aggr_column_index)
         if end_range - start_range <= 0:
             return "ERROR: invalid range"
-
+        query_columns = [0] * (self.num_columns+4)
+        query_columns[aggr_column_index + 4] = 1
         # go through keys within range
         for key_in_range in range(start_range, end_range + 1):
             # read_record to get back column to aggregate
-            aggr_record = self.read_record(key_in_range, [aggr_column_index])
+            aggr_record, tail_record = self.read_record(key_in_range, query_columns)
+            if tail_record:
+                aggr_record = tail_record
             # if key exists, sum
-            if aggr_record.rid is None:
-                sum_col += aggr_record.columns[0]
+            if aggr_record:
+                sum_col += struct.unpack(ENCODING, aggr_record.columns[0])[0]
         return sum_col
 
     def __merge(self):
