@@ -1,7 +1,9 @@
 from table import Table, Record
 from index import Index
+from config import *
 import time
 import datetime
+import struct
 
 
 class Query:
@@ -29,7 +31,10 @@ class Query:
     # Read a record with specified key
     """
     def select(self, key, query_columns):
-        return self.table.read_record(key, query_columns)
+        record = self.table.read_record(key, query_columns)
+        for i in range(0, len(record.columns)):
+            record.columns[i] = struct.unpack(ENCODING, record.columns[i])[0]
+        return record
 
     """
     # Update a record with specified key and columns
