@@ -9,7 +9,6 @@ SCHEMA_ENCODING_COLUMN = 3
 
 
 class Record:
-
     def __init__(self, rid, key, *columns):
         self.rid = rid
         self.key = key
@@ -28,7 +27,7 @@ class Column:
     Using update means that there already existed a base record, so this
     new value will be added to a tail_page
     '''
-    def update(value):
+    def update(self, value):
         #get the most recent page
         current_page = self.tail_pages[-1]
         #if the current page is full, create a new page
@@ -84,7 +83,7 @@ class Table:
         # create a base page and index for each column
         for i in range(0, self.num_columns - 1):
             column_directory[i] = Column(table=self)
-            column_directory[i].index.create_index(table=self, column_number=i)\\
+            column_directory[i].index.create_index(table=self, column_number=i)
         return column_directory
 
     """
@@ -150,32 +149,27 @@ class Table:
         # get the schema encoding
         schema_encoding = ''
         for i in columns:
-            # if value in column is not 'None' add 1qwe
+            # if value in column is not 'None' add 1
             if columns[i]:
                 schema_encoding = schema_encoding + '1'
-
-            # else add 1
+            # else add 0
             else:
                 schema_encoding = schema_encoding + '0'
 
         schema_encoding = int(schema_encoding, 2)
 
-        # find value for indirection column
-        # indirection_value = None #initialize
-        # if record.columns[INDIRECTION_COLUMN]:
-        #     indirection_value = record.columns[INDIRECTION_COLUMN]
-
         # Find the RID/LID of the latest record
-        latest_rec_vals = None
+        latest_rec_vals = []
+        # for indirection column
+        id = record.rid
         if record.columns[INDIRECTION_COLUMN]: #latest is a tail record
             id = record.columns[INDIRECTION_COLUMN]
             page_num, offset = self.page_directory[id]
-
             # for every column we want collect it in our column_values list
             for i, column in self.column_directory:
                 latest_rec_vals.append(column.base_pages[page_num].data[offset: offset + 8])
         else: #latest record is base record
-            latest_rec_vals = record.columns
+            latest_rec_vals = record.columns[4:]
 
         # get LID value
         LID = self.get_LID_value()
@@ -184,19 +178,18 @@ class Table:
         self.update_schema_indirection(key=key, schema_encoding=schema_encoding, indirection_value=LID)
 
         # add the four bookkeeping columns to the beginning of columns
-        columns.insert(INDIRECTION_COLUMN, None)
+        columns.insert(INDIRECTION_COLUMN, id)
         columns.insert(RID_COLUMN, LID)
         columns.insert(TIMESTAMP_COLUMN, time())
         columns.insert(SCHEMA_ENCODING_COLUMN, schema_encoding)
 
         # add the tail record column by column
-        self.column_directory[INDIRECTION_COLUMN].update(columns[INDIRECTION_COLUMN])
-        for i in range(1, len(self.column_directory)):
+        for i in range(0, len(self.column_directory)):
             if columns[i]:
                 self.column_directory[i].update(columns[i])
             else:
                 self.column_directory[i].update(latest_rec_vals[i])
-                
+
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
     :param: key: int                                # the primary key value of the record we are adding an update for
