@@ -1,7 +1,7 @@
 from page import Page
 from time import time
 from index import Index
-from BTress.OOBTree import OOBTree
+from BTrees.OOBTree import OOBTree
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
