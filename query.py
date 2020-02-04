@@ -32,6 +32,8 @@ class Query:
     """
     def select(self, key, query_columns):
         record = self.table.read_record(key, query_columns)
+        # temp = record.columns
+        record.columns = record.columns[4:]
         for i in range(0, len(record.columns)):
             record.columns[i] = struct.unpack(ENCODING, record.columns[i])[0]
         return record

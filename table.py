@@ -1,7 +1,9 @@
 from page import Page
 from time import time
 from index import Index
+from config import *
 from BTrees.OOBTree import OOBTree
+import struct
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
@@ -180,7 +182,7 @@ class Table:
 
         # get the schema encoding
         schema_encoding = ''
-        for i in columns:
+        for i in range (0, len(columns)):
             # if value in column is not 'None' add 1
             if columns[i]:
                 schema_encoding = schema_encoding + '1'
@@ -193,9 +195,11 @@ class Table:
         # Find the RID/LID of the latest record
         latest_rec_vals = []
         # for indirection column
-        id = record.rid
-        if record.columns[INDIRECTION_COLUMN]: #latest is a tail record
+        id = record.rid[0]
+        if record.columns[INDIRECTION_COLUMN] == 0: #latest is a tail record
             id = record.columns[INDIRECTION_COLUMN]
+            id = struct.unpack(ENCODING, id)[0]
+            print(id)
             page_num, offset = self.page_directory.get(id)
             # for every column we want collect it in our column_values list
             for i, column in self.column_directory:
@@ -230,14 +234,16 @@ class Table:
     """
     def update_schema_indirection(self, key, schema_encoding, indirection_value):
         # get RID from index
-        RID = self.column_directory[self.key].index.locate(value=key)
-
+        # FIXME: how to account for which RID is used.. for now just subscript [0]
+        RID = self.column_directory[self.key].index.locate(value=key)[0]
         # get page number and offset of record within columns
         [page_number, offset] = self.page_directory.get(RID)
 
         # update the values in the base record
-        self.column_directory[INDIRECTION_COLUMN].base_pages[page_number][offset: offset + 8] = indirection_value
-        self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number][offset: offset + 8] = schema_encoding
+        print("indirection value:", indirection_value)
+        
+        self.column_directory[INDIRECTION_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(ENCODING, indirection_value)
+        self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(ENCODING, schema_encoding)
 
     """
     A method which returns a the record with the given primary key
@@ -271,7 +277,7 @@ class Table:
         #     if query_columns[i]:
         #         column_values.append(column.base_pages[page_num].data[offset: offset + 8])
 
-        return Record(rid=rid, key=key, columns=column_values[4:])
+        return Record(rid=rid, key=key, columns=column_values)
 
     """
     A method which returns a the record with the given primary key
