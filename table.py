@@ -9,7 +9,6 @@ SCHEMA_ENCODING_COLUMN = 3
 
 
 class Record:
-
     def __init__(self, rid, key, *columns):
         self.rid = rid
         self.key = key
@@ -23,12 +22,22 @@ class Column:
         self.base_pages = [Page()]
         self.tail_pages = [Page()]
 
-    def add(self, col_val):
-        if not self.base_pages[-1].has_capacity():
-            self.base_pages.append(Page())
+    '''
+    Adding a new data entry to the column.
+    Using update means that there already existed a base record, so this
+    new value will be added to a tail_page
+    '''
+    def update(self, value):
+        #get the most recent page
+        current_page = self.tail_pages[-1]
+        #if the current page is full, create a new page
+        if not current_page.has_capacity():
+            current_page = Page()
+            #appending new page to the tail_pages array of that column
+            self.tail_pages.append(current_page)
 
-        self.base_pages[-1].write(col_val)
-
+        current_page.write(value)
+        print("Record updated")
 
 class Table:
     """
@@ -48,9 +57,8 @@ class Table:
         # the number is augmented by four for the book keeping columns
         self.num_columns = num_columns + 4
 
-        # A dictionary of the columns
-        # key: is column number
-        # value: first base page, index for column
+        # An array of the columns where index is column number
+        # Each element in the array represents a column in the table
         # columns 0-3 are bookkeeping
         # the rest of the columns are the user columns
         self.column_directory = self.make_columns()
@@ -76,7 +84,6 @@ class Table:
         for i in range(0, self.num_columns - 1):
             column_directory[i] = Column(table=self)
             column_directory[i].index.create_index(table=self, column_number=i)
-
         return column_directory
 
     """
@@ -137,26 +144,32 @@ class Table:
     """
     def update_record(self, key, columns):
         # get the base record
-        record = self.read_record(key=key, query_columns=[0, 1, 2, 3])
+        record = self.read_record(key=key, query_columns=[x for x in range(0, len(columns) + 4)])
 
         # get the schema encoding
         schema_encoding = ''
         for i in columns:
-            # if value in column is 'None' add 0
+            # if value in column is not 'None' add 1
             if columns[i]:
-                schema_encoding = schema_encoding + '0'
-
-            # else add 1
-            else:
                 schema_encoding = schema_encoding + '1'
+            # else add 0
+            else:
+                schema_encoding = schema_encoding + '0'
 
         schema_encoding = int(schema_encoding, 2)
 
-        # find value for indirection column
-        if record.columns[INDIRECTION_COLUMN]:
-            indirection_value = record.columns[INDIRECTION_COLUMN]
-        else:
-            indirection_value = None
+        # Find the RID/LID of the latest record
+        latest_rec_vals = []
+        # for indirection column
+        id = record.rid
+        if record.columns[INDIRECTION_COLUMN]: #latest is a tail record
+            id = record.columns[INDIRECTION_COLUMN]
+            page_num, offset = self.page_directory[id]
+            # for every column we want collect it in our column_values list
+            for i, column in self.column_directory:
+                latest_rec_vals.append(column.base_pages[page_num].data[offset: offset + 8])
+        else: #latest record is base record
+            latest_rec_vals = record.columns[4:]
 
         # get LID value
         LID = self.get_LID_value()
@@ -165,14 +178,17 @@ class Table:
         self.update_schema_indirection(key=key, schema_encoding=schema_encoding, indirection_value=LID)
 
         # add the four bookkeeping columns to the beginning of columns
-        columns.insert(INDIRECTION_COLUMN, indirection_value)
+        columns.insert(INDIRECTION_COLUMN, id)
         columns.insert(RID_COLUMN, LID)
         columns.insert(TIMESTAMP_COLUMN, time())
         columns.insert(SCHEMA_ENCODING_COLUMN, schema_encoding)
 
         # add the tail record column by column
-        for i, column in self.column_directory:
-            column.update(columns[i])
+        for i in range(0, len(self.column_directory)):
+            if columns[i]:
+                self.column_directory[i].update(columns[i])
+            else:
+                self.column_directory[i].update(latest_rec_vals[i])
 
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
@@ -190,7 +206,6 @@ class Table:
         # update the values in the base record
         self.column_directory[INDIRECTION_COLUMN].base_pages[page_number][offset: offset + 8] = indirection_value
         self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number][offset: offset + 8] = schema_encoding
-        pass
 
     """
     A method which returns a the record with the given primary key
