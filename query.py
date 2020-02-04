@@ -29,7 +29,7 @@ class Query:
     # Read a record with specified key
     """
     def select(self, key, query_columns):
-        self.table.read_record(key, query_columns)
+        return self.table.read_record(key, query_columns)
 
     """
     # Update a record with specified key and columns

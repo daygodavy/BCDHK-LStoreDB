@@ -21,10 +21,10 @@ class Index:
     """
     def locate(self, value):
         # convert value to byte form before locating
-        byte_val = struct.pack(ENCODING, value)
-
-        if self.btree.has_key(byte_val):
-            return self.btree.get(byte_val)
+        # byte_val = struct.pack(ENCODING, value)
+        # print("checker:", self.btree.values())
+        if self.btree.has_key(value) > 0:
+            return self.btree.get(value)
         return None
 
     """
@@ -43,10 +43,10 @@ class Index:
                 self.rid = self.rid + 1
 
                 # get the entry value itself
-                entry = page.read(self, start_idx)
+                entry = struct.unpack(ENCODING, page.read(start_idx))[0]
 
                 # check if key exists in btree
-                if self.btree.has_key(entry):
+                if self.btree.has_key(entry) > 0:
 
                     # append new rid to the existing entry (key)
                     rids = self.btree.get(entry)
@@ -69,17 +69,17 @@ class Index:
     """
     def add_index(self, value):
         # convert value to byte value comparison and addition to byte array
-        byte_val = struct.pack(ENCODING, value)
+        # byte_val = struct.pack(ENCODING, value)
         self.rid = self.rid + 1
 
         # check if key exists in btree
-        if self.btree.has_key(byte_val):
+        if self.btree.has_key(value):
 
             # append new rid to the existing entry (key)
-            rids = self.btree.get(byte_val)
+            rids = self.btree.get(value)
             rids.append(self.rid)
-            self.btree.update({byte_val: rids})
+            self.btree.update({value: rids})
 
         else:
             # create new node { entry : rid }
-            self.btree.update({byte_val: [self.rid]})
+            self.btree.update({value: [self.rid]})

@@ -125,6 +125,8 @@ class Table:
     def add_record(self, *columnValues):
         # add the four bookkeeping columns to the beginning of columnValues
         rid = self.get_RID_value()
+
+        #TODO: cannot just convert time to int
         col_vals = [0, rid, int(time()), 0]
         # columnValues.insert(INDIRECTION_COLUMN, None)
         # columnValues.insert(RID_COLUMN, rid)
@@ -146,9 +148,6 @@ class Table:
                 if self.column_directory[i].index:
                     column.index.add_index(col_vals[i])
             self.page_directory.update({rid : [page_num, offset]})
-
-        # increment num of records
-        self.num_records += 1
 
     """
     A method for deleting lazy deletion of a base record
@@ -260,19 +259,19 @@ class Table:
         # if key was located
         if rid is not None:
             # find the base page number and offset in the byte array for the relevant record
-            page_num, offset = self.page_directory.get(rid)
+            page_num, offset = self.page_directory.get(rid[0])
 
             # for every column we want collect it in our column_values list
-            for i, column in self.column_directory:
-                if query_columns[i]:
-                    column_values.append(column.base_pages[page_num].data[offset: offset + 8])
+            for i in range(0, len(self.column_directory)):
+                if self.column_directory[i]:
+                    column_values.append(self.column_directory[i].base_pages[page_num].data[offset: offset + 8])
 
         # for every column we want collect it in our column_values list
-        for i, column in self.column_directory:
-            if query_columns[i]:
-                column_values.append(column.base_pages[page_num].data[offset: offset + 8])
+        # for i, column in self.column_directory:
+        #     if query_columns[i]:
+        #         column_values.append(column.base_pages[page_num].data[offset: offset + 8])
 
-        return Record(rid=rid, key=key, columns=column_values)
+        return Record(rid=rid, key=key, columns=column_values[4:])
 
     """
     A method which returns a the record with the given primary key
