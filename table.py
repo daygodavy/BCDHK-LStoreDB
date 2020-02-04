@@ -49,6 +49,7 @@ class Column:
             #appending new page to the tail_pages array of that column
             self.tail_pages.append(current_page)
 
+        print(value)
         current_page.write(value)
         print("Record updated")
 
@@ -179,10 +180,12 @@ class Table:
     def update_record(self, key, columns):
         # get the base record
         record = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
+        col_vals = []
 
         # get the schema encoding
         schema_encoding = ''
         for i in range (0, len(columns)):
+            col_vals.append(columns[i])
             # if value in column is not 'None' add 1
             if columns[i]:
                 schema_encoding = schema_encoding + '1'
@@ -196,16 +199,16 @@ class Table:
         latest_rec_vals = []
         # for indirection column
         id = record.rid[0]
-        if record.columns[INDIRECTION_COLUMN] == 0: #latest is a tail record
-            id = record.columns[INDIRECTION_COLUMN]
-            id = struct.unpack(ENCODING, id)[0]
-            print(id)
+        indirection = struct.unpack(ENCODING, record.columns[INDIRECTION_COLUMN])[0]
+        if indirection != 0: #latest is a tail record
+            id = indirection
             page_num, offset = self.page_directory.get(id)
             # for every column we want collect it in our column_values list
-            for i, column in self.column_directory:
-                latest_rec_vals.append(column.base_pages[page_num].data[offset: offset + 8])
+            for column in self.column_directory:
+                print("===", struct.unpack(ENCODING, column.base_pages[page_num].read(offset)))
+                latest_rec_vals.append(struct.unpack(ENCODING, column.base_pages[page_num].read(offset)))
         else: #latest record is base record
-            latest_rec_vals = record.columns[4:]
+            latest_rec_vals = [struct.unpack(ENCODING, x)[0] for x in record.columns[4:]]
 
         # get LID value
         LID = self.get_LID_value()
@@ -214,17 +217,21 @@ class Table:
         self.update_schema_indirection(key=key, schema_encoding=schema_encoding, indirection_value=LID)
 
         # add the four bookkeeping columns to the beginning of columns
-        columns.insert(INDIRECTION_COLUMN, id)
-        columns.insert(RID_COLUMN, LID)
-        columns.insert(TIMESTAMP_COLUMN, time())
-        columns.insert(SCHEMA_ENCODING_COLUMN, schema_encoding)
+        col_vals.insert(INDIRECTION_COLUMN, id)
+        col_vals.insert(RID_COLUMN, LID)
+        col_vals.insert(TIMESTAMP_COLUMN, int(time()))
+        col_vals.insert(SCHEMA_ENCODING_COLUMN, schema_encoding)
 
         # add the tail record column by column
-        for i in range(0, len(self.column_directory)):
-            if columns[i]:
-                self.column_directory[i].update(columns[i])
+        for i in range(0, 4):
+            print("updating column", i)
+            self.column_directory[i].update(col_vals[i])
+
+        for i in range(0, len(latest_rec_vals)):
+            if col_vals[i+4]:
+                self.column_directory[i+4].update(col_vals[i])
             else:
-                self.column_directory[i].update(latest_rec_vals[i])
+                self.column_directory[i+4].update(latest_rec_vals[i])
 
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
@@ -240,8 +247,6 @@ class Table:
         [page_number, offset] = self.page_directory.get(RID)
 
         # update the values in the base record
-        print("indirection value:", indirection_value)
-        
         self.column_directory[INDIRECTION_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(ENCODING, indirection_value)
         self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(ENCODING, schema_encoding)
 
