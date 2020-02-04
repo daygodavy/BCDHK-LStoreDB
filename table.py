@@ -23,7 +23,7 @@ class Column:
         self.base_pages = [Page()]
         self.tail_pages = [Page()]
 
-     def add(self, col_val):
+    def add(self, col_val):
         if  not self.base_pages[-1].has_capacity():
             self.base_pages.append(Page())
 
@@ -83,7 +83,7 @@ class Table:
         self.tail_record_tracker = (2 ** 64)
         pass
 
-     '''
+    '''
     Method which initialize the page directory as B+ tree
     '''
     def init_page_directory(self):
@@ -97,8 +97,8 @@ class Table:
         column_directory = []
 
         # create a base page and index for each column
-        for i in range(0, self.num_columns - 1):
-            column_directory[i] = Column()
+        for i in range(0, self.num_columns):
+            column_directory.append(Column())
 
         return column_directory
 
@@ -121,7 +121,7 @@ class Table:
     :param key: int         #the index of the primary key column
     :param columns: []      #the column values
     """
-    def add_record(self, key, columnValues):
+    def add_record(self, columnValues):
         # add the four bookkeeping columns to the beginning of columnValues
         rid = self.get_RID_value()
         columnValues.insert(INDIRECTION_COLUMN, None)
@@ -130,7 +130,7 @@ class Table:
         columnValues.insert(SCHEMA_ENCODING_COLUMN, 0)
 
         # if this primary key already exists within the table then reject the addition of this record
-        if self.column_directory[self.key].index.locate(columnValues[key]):
+        if self.column_directory[self.key].index.locate(columnValues[self.key]):
             return "ERROR: this primary key already exists within the table"
 
         # otherwise for each column in the table add the value

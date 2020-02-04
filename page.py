@@ -1,5 +1,5 @@
 from config import *
-from table import *
+# from table import *
 import struct
 import logging
 
@@ -46,17 +46,17 @@ class Page:
             return print("Index Beyond Range")
 
 
-print("Records per page: " + str(RECORDS_PER_PAGE))
-temp = Page()
-print("temp has capacity?")
-print(temp.has_capacity())
-print("num records: " + str(temp.num_records))
-temp.write(123)
-print("num records: " + str(temp.num_records))
-temp.write(4)
-print("num records: " + str(temp.num_records))
-temp.write(6)
-print("num records: " + str(temp.num_records))
-temp.write(8)
-print(temp.read(0))
-print(temp.data)
+# print("Records per page: " + str(RECORDS_PER_PAGE))
+# temp = Page()
+# print("temp has capacity?")
+# print(temp.has_capacity())
+# print("num records: " + str(temp.num_records))
+# temp.write(123)
+# print("num records: " + str(temp.num_records))
+# temp.write(4)
+# print("num records: " + str(temp.num_records))
+# temp.write(6)
+# print("num records: " + str(temp.num_records))
+# temp.write(8)
+# print(temp.read(0))
+# print(temp.data)

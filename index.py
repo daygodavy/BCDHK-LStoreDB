@@ -1,4 +1,4 @@
-from table import Table
+#from table import Table
 from config import *
 from BTrees.OOBTree import OOBTree
 import struct
