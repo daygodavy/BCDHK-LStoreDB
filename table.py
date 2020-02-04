@@ -142,6 +142,7 @@ class Table:
 
         # otherwise for each column in the table add the value
         else:
+            page_num = offset = -1
             for i in range(0, len(self.column_directory)):
                 page_num, offset = self.column_directory[i].add(col_vals[i])
                 if self.column_directory[i].index:
@@ -193,25 +194,24 @@ class Table:
             # else add 0
             else:
                 schema_encoding = schema_encoding + '0'
-        print("col_vals after changing", col_vals)
+
         schema_encoding = int(schema_encoding, 2)
         col_vals[SCHEMA_ENCODING_COLUMN] = schema_encoding
+        #update indirection column of base record
+        self.update_schema_indirection(key, schema_encoding, LID)
 
         #find the latest tail record
         if tail_record: #latest is a tail record
             # for every column we want collect it in our column_values list
-            print("tail", tail_record.columns)
             for i in range(4, len(columns) + 4):
                 if not col_vals[i]:
                     col_vals[i] = struct.unpack(ENCODING, tail_record.columns[i])[0]
         else: #latest record is base record
             for i in range(4, len(columns) + 4):
                 if not col_vals[i]:
-                    # print("===", struct.unpack(ENCODING, column.tail_pages[page_num].read(offset)))
                     col_vals[i] = struct.unpack(ENCODING, base_record.columns[i])[0]
 
         page_num = offset = -1
-        print("Col vals after everything is appended", col_vals)
         for i in range(0, len(col_vals)):
             page_num, offset = self.column_directory[i].update(col_vals[i])
         self.page_directory.update({LID : [page_num, offset]})
@@ -245,7 +245,6 @@ class Table:
         column_values = []
         base_record = None
         tail_record = None
-        #print("Here")
         # if there is no index for this column yet, create it
         if not self.column_directory[self.key].index:
             self.column_directory[self.key].index = Index(table=self, column_number=self.key)
@@ -270,13 +269,7 @@ class Table:
             for i in range(len(self.column_directory)):
                 if query_columns[i]:
                     column_values.append(self.column_directory[i].base_pages[base_page_num].read(base_offset))
-                # print(struct.unpack(ENCODING, self.column_directory[i].base_pages[base_page_num].read(base_offset)))
             base_record = Record(rid=rid, key=key, columns=column_values)
-
-        # for every column we want collect it in our column_values list
-        # for i, column in self.column_directory:
-        #     if query_columns[i]:
-        #         column_values.append(column.base_pages[page_num].data[offset: offset + 8])
 
         return base_record, tail_record
 

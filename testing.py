@@ -43,13 +43,12 @@ for key in records:
         value = randint(0, 20)
         updated_columns[i] = value
         original = records[key].copy()
+        print("original", original)
         records[key][i] = value
         query.update(key, *updated_columns)
         record = query.select(key, [1, 1, 1, 1, 1])#[0]
         error = False
 
-        print("Result", record.columns)
-        print("Expected", records[key])
         for j, column in enumerate(record.columns):
             if column != records[key][j]:
                 error = True
