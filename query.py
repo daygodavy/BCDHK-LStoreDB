@@ -35,20 +35,7 @@ class Query:
         :param key: int             # the key value to select records based on
         :param query_columns: []    # what columns to return. array of 1 or 0 values
         """
-        record_list = []
-        query_columns = [0] * 4 + query_columns
-        records = self.table.read_record(key, query_columns)
-        for record in records:
-            for i in range(0, len(record.columns)):
-                record.columns[i] = struct.unpack(ENCODING, record.columns[i])[0]
-            record_list.append(record)
-        return record_list
-        # if tail_record:
-        #     record = tail_record
-        # for i in range(0, len(record.columns)):
-        #     record.columns[i] = struct.unpack(ENCODING, record.columns[i])[0]
-        # record_list.append(record)
-        # return record_list
+        return self.table.read_record(key, [0] * 4 + query_columns)
 
     def update(self, key, *columns):
         """

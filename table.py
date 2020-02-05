@@ -197,7 +197,6 @@ class Table:
         LID = self.get_LID_value()
 
         # get the base record
-        # base_record, tail_record = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
         records = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
 
         for record in records:
@@ -221,19 +220,12 @@ class Table:
 
                 # update the indirection value in the tail record
                 self.column_directory[INDIRECTION_COLUMN].tail_pages[tail_page_num].data[
-                tail_offset: tail_offset + 8] = struct.pack(ENCODING, LID)
-
-                # # for every column, if we have a new value save it, otherwise use old value
-                # for i in range(4, len(columns) + 4):
-                #     if col_vals[i] is None:
-                #         col_vals[i] = struct.unpack(ENCODING, tail_record.columns[i])[0]
-
-            # otherwise the latest record is the base record
+                    tail_offset: tail_offset + 8] = struct.pack(ENCODING, LID)
 
             # for every column, if we have a new value save it, otherwise use old value
             for i in range(4, len(columns) + 4):
                 if col_vals[i] is None:
-                    col_vals[i] = struct.unpack(ENCODING, record.columns[i])[0]
+                    col_vals[i] = record.columns[i]
 
             # update page directory
             page_num = offset = -1
@@ -281,8 +273,8 @@ class Table:
         """
         # list to hold the wanted column values
         column_values = []
-        # base_record = []
-        # tail_record = []
+
+        # list to hold the records
         records = []
 
         # if there is no index for this column yet, create it
@@ -299,6 +291,7 @@ class Table:
 
         # for all RID values returned from the index
         for RID in rids:
+
             # find the base page number and offset in the byte array for the relevant record
             base_page_num, base_offset = self.page_directory.get(RID)
 
@@ -309,17 +302,22 @@ class Table:
                 # if tail record/s find the page number and offset
                 tail_page_num, tail_offset = self.page_directory.get(lid)
 
-                # collect those values and create a record from it
+                # create a record object
                 for i in range(len(self.column_directory)):
                     if query_columns[i]:
-                        column_values.append(self.column_directory[i].tail_pages[tail_page_num].read(tail_offset))
+                        column_values.append(struct.unpack(ENCODING, self.column_directory[i].tail_pages[tail_page_num].read(tail_offset))[0])
+
+                # add it to records
                 records.append(Record(rid=lid, key=key, columns=column_values))
+
+            # otherwise there is only the base record
             else:
-                # for every column we want collect it in our column_values list
-                column_values = []
+                # create a record object
                 for i in range(len(self.column_directory)):
                     if query_columns[i]:
-                        column_values.append(self.column_directory[i].base_pages[base_page_num].read(base_offset))
+                        column_values.append(struct.unpack(ENCODING, self.column_directory[i].base_pages[base_page_num].read(base_offset))[0])
+
+                # add it to records
                 records.append(Record(rid=RID, key=key, columns=column_values))
 
         return records
@@ -345,14 +343,13 @@ class Table:
 
         # go through keys within range
         for key_in_range in range(start_range, end_range + 1):
-            # read_record to get back column to aggregate
+
+            # get all records that match key_in_range
             records = self.read_record(key_in_range, query_columns)
+
+            # sum each record that matches key in range
             for record in records:
-                # if tail_record:
-                #     aggr_record = tail_record
-                # # if key exists, sum
-                # if aggr_record:
-                sum_col += struct.unpack(ENCODING, record.columns[0])[0]
+                sum_col += record.columns[0]
         return sum_col
 
     def __merge(self):
