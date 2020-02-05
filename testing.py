@@ -1,17 +1,17 @@
-#from lstore.db import Database
-# from lstore.query import Query
-# from lstore.config import init
 from db import Database
 from query import Query
-# from config import init
+from config import init
+
 from random import choice, randint, sample, seed
 from colorama import Fore, Back, Style
 
 # Student Id and 4 grades
-# init()
+init()
 db = Database()
 grades_table = db.create_table('Grades', 5, 0)
 query = Query(grades_table)
+
+file = open("our_output.txt", "w")
 
 records = {}
 
@@ -23,19 +23,18 @@ for i in range(0, 1000):
         key = 92106429 + randint(0, 9000)
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     query.insert(*records[key])
-    print('inserted', records[key])
+    file.write('inserted' + str(records[key]) + '\n')
 
 for key in records:
     record = query.select(key, [1, 1, 1, 1, 1])[0]
     error = False
-
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
             error = True
     if error:
-        print('select error on', key , ':', record, ', correct:', records[key])
+        file.write('select error on' + str(key) + ':' + str(record) + ', correct:' + str(records[key]) + '\n')
     else:
-        print('select on', key, ':', record)
+        file.write('select on' + str(key) + ':' + str(record) + '\n')
 
 for key in records:
     updated_columns = [None, None, None, None, None]
@@ -47,14 +46,14 @@ for key in records:
         query.update(key, *updated_columns)
         record = query.select(key, [1, 1, 1, 1, 1])[0]
         error = False
-
         for j, column in enumerate(record.columns):
             if column != records[key][j]:
                 error = True
         if error:
-            print('update error on', original, 'and', updated_columns, ':', record, ', correct:', records[key])
+            file.write('update error on' + str(original) + 'and' + str(updated_columns) + ':' + str(
+                record) + ', correct:' + str(records[key]) + '\n')
         else:
-            print('update on', original, 'and', updated_columns, ':', record)
+            file.write('update on' + str(original) + 'and' + str(updated_columns) + ':' + str(record) + '\n')
         updated_columns[i] = None
 
 keys = sorted(list(records.keys()))
@@ -64,6 +63,8 @@ for c in range(0, grades_table.num_columns):
         column_sum = sum(map(lambda key: records[key][c], keys[r[0]: r[1] + 1]))
         result = query.sum(keys[r[0]], keys[r[1]], c)
         if column_sum != result:
-            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
+            file.write(
+                'sum error on [' + str(keys[r[0]]) + ',' + str(keys[r[1]]) + ']: ' + str(result) + ', correct: ' + str(
+                    column_sum) + '\n')
         else:
-            print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
+            file.write('sum on [' + str(keys[r[0]]) + ',' + str(keys[r[1]]) + ']: ' + str(column_sum) + '\n')
