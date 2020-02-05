@@ -37,13 +37,18 @@ class Query:
         """
         record_list = []
         query_columns = [0] * 4 + query_columns
-        record, tail_record = self.table.read_record(key, query_columns)
-        if tail_record:
-            record = tail_record
-        for i in range(0, len(record.columns)):
-            record.columns[i] = struct.unpack(ENCODING, record.columns[i])[0]
-        record_list.append(record)
+        records = self.table.read_record(key, query_columns)
+        for record in records:
+            for i in range(0, len(record.columns)):
+                record.columns[i] = struct.unpack(ENCODING, record.columns[i])[0]
+            record_list.append(record)
         return record_list
+        # if tail_record:
+        #     record = tail_record
+        # for i in range(0, len(record.columns)):
+        #     record.columns[i] = struct.unpack(ENCODING, record.columns[i])[0]
+        # record_list.append(record)
+        # return record_list
 
     def update(self, key, *columns):
         """

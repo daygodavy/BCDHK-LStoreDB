@@ -11,8 +11,6 @@ db = Database()
 grades_table = db.create_table('Grades', 5, 0)
 query = Query(grades_table)
 
-file = open("our_output.txt", "w")
-
 records = {}
 
 seed(3562901)
@@ -23,7 +21,7 @@ for i in range(0, 1000):
         key = 92106429 + randint(0, 9000)
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     query.insert(*records[key])
-    file.write('inserted' + str(records[key]) + '\n')
+    print('inserted', records[key])
 
 for key in records:
     record = query.select(key, [1, 1, 1, 1, 1])[0]
@@ -32,9 +30,9 @@ for key in records:
         if column != records[key][i]:
             error = True
     if error:
-        file.write('select error on' + str(key) + ':' + str(record) + ', correct:' + str(records[key]) + '\n')
+        print('select error on', key , ':', record, ', correct:', records[key])
     else:
-        file.write('select on' + str(key) + ':' + str(record) + '\n')
+        print('select on', key, ':', record.columns)
 
 for key in records:
     updated_columns = [None, None, None, None, None]
@@ -50,10 +48,9 @@ for key in records:
             if column != records[key][j]:
                 error = True
         if error:
-            file.write('update error on' + str(original) + 'and' + str(updated_columns) + ':' + str(
-                record) + ', correct:' + str(records[key]) + '\n')
+            print('update error on', original, 'and', updated_columns, ':', record, ', correct:', records[key])
         else:
-            file.write('update on' + str(original) + 'and' + str(updated_columns) + ':' + str(record) + '\n')
+            print('update on', original, 'and', updated_columns, ':', record.columns)
         updated_columns[i] = None
 
 keys = sorted(list(records.keys()))
@@ -63,8 +60,9 @@ for c in range(0, grades_table.num_columns):
         column_sum = sum(map(lambda key: records[key][c], keys[r[0]: r[1] + 1]))
         result = query.sum(keys[r[0]], keys[r[1]], c)
         if column_sum != result:
-            file.write(
-                'sum error on [' + str(keys[r[0]]) + ',' + str(keys[r[1]]) + ']: ' + str(result) + ', correct: ' + str(
-                    column_sum) + '\n')
+            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
         else:
-            file.write('sum on [' + str(keys[r[0]]) + ',' + str(keys[r[1]]) + ']: ' + str(column_sum) + '\n')
+            print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
+
+
+
