@@ -23,14 +23,10 @@ class Page:
     :param: value: int              # the value record value to be written
     """
     def write(self, value):
-        logging.warning("this worked")
         if self.has_capacity():
             start = self.num_records * 8
-            print("num records in write: " + str(self.num_records))
             self.num_records += 1
-            print("num records in write: " + str(self.num_records))
             self.data[start: start + 8] = struct.pack(ENCODING, value)
-            print("success")
             return start
         else:
             return print("page full")
@@ -44,19 +40,3 @@ class Page:
             return self.data[start_index: start_index + 8]
         else:
             return print("Index Beyond Range")
-
-
-# print("Records per page: " + str(RECORDS_PER_PAGE))
-# temp = Page()
-# print("temp has capacity?")
-# print(temp.has_capacity())
-# print("num records: " + str(temp.num_records))
-# temp.write(123)
-# print("num records: " + str(temp.num_records))
-# temp.write(4)
-# print("num records: " + str(temp.num_records))
-# temp.write(6)
-# print("num records: " + str(temp.num_records))
-# temp.write(8)
-# print(temp.read(0))
-# print(temp.data)

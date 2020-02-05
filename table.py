@@ -119,8 +119,7 @@ class Table:
         # add the four bookkeeping columns to the beginning of columnValues
         rid = self.get_RID_value()
 
-        #TODO: cannot just convert time to int
-        col_vals = [0, rid, int(time()), 0]
+        col_vals = [0, rid, int(time()*1000), 0]
 
         for item in columnValues:
             col_vals.append(item)
@@ -171,7 +170,7 @@ class Table:
         # get the base record
         base_record, tail_record = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
         col_vals = [0]*(len(columns) + 4)
-        col_vals[TIMESTAMP_COLUMN] = int(time())
+        col_vals[TIMESTAMP_COLUMN] = int(time()*1000)
         col_vals[RID_COLUMN] = LID
         col_vals[INDIRECTION_COLUMN] = base_record.rid
 
@@ -276,7 +275,6 @@ class Table:
     """
     def sum_records(self, start_range, end_range, aggr_column_index):
         sum_col = 0
-        print(aggr_column_index)
         if end_range - start_range <= 0:
             return "ERROR: invalid range"
         query_columns = [0] * (self.num_columns+4)

@@ -17,7 +17,6 @@ records = {}
 
 seed(3562901)
 
-print("============== INSERT ==============")
 for i in range(0, 1000):
     key = 92106429 + randint(0, 9000)
     while key in records:
@@ -26,9 +25,8 @@ for i in range(0, 1000):
     query.insert(*records[key])
     print('inserted', records[key])
 
-print("============== SELECT ==============")
 for key in records:
-    record = query.select(key, [1, 1, 1, 1, 1])#[0]
+    record = query.select(key, [1, 1, 1, 1, 1])[0]
     error = False
 
     for i, column in enumerate(record.columns):
@@ -39,7 +37,6 @@ for key in records:
     else:
         print('select on', key, ':', record)
 
-print("============== UPDATE ==============")
 for key in records:
     updated_columns = [None, None, None, None, None]
     for i in range(1, grades_table.num_columns):
@@ -48,10 +45,9 @@ for key in records:
         original = records[key].copy()
         records[key][i] = value
         query.update(key, *updated_columns)
-        record = query.select(key, [1, 1, 1, 1, 1])#[0]
+        record = query.select(key, [1, 1, 1, 1, 1])[0]
         error = False
 
-        print("Get", record.columns)
         for j, column in enumerate(record.columns):
             if column != records[key][j]:
                 error = True
@@ -61,7 +57,6 @@ for key in records:
             print('update on', original, 'and', updated_columns, ':', record)
         updated_columns[i] = None
 
-print("============== SUM ==============")
 keys = sorted(list(records.keys()))
 for c in range(0, grades_table.num_columns):
     for i in range(0, 20):

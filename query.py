@@ -31,13 +31,15 @@ class Query:
     # Read a record with specified key
     """
     def select(self, key, query_columns):
+        record_list = []
         query_columns = [0]*4 + query_columns
         record, tail_record = self.table.read_record(key, query_columns)
         if tail_record:
             record = tail_record
         for i in range(0, len(record.columns)):
             record.columns[i] = struct.unpack(ENCODING, record.columns[i])[0]
-        return record
+        record_list.append(record)
+        return record_list
 
     """
     # Update a record with specified key and columns
