@@ -11,6 +11,22 @@ TIMESTAMP_COLUMN = 2
 SCHEMA_ENCODING_COLUMN = 3
 
 
+def get_schema_encoding(columns):
+    """
+    A method which creates the schema encoding for the given record
+    :param columns: list            # the record in a list format
+    """
+    schema_encoding = ''
+    for item in columns:
+        # if value in column is not 'None' add 1
+        if item:
+            schema_encoding = schema_encoding + '1'
+        # else add 0
+        else:
+            schema_encoding = schema_encoding + '0'
+    return int(schema_encoding, 2)
+
+
 class Record:
 
     def __init__(self, rid, key, columns):
@@ -82,7 +98,7 @@ class Table:
 
         # tail 2^64 - self.tail_record_tracker = number of tail records
         self.tail_record_tracker = (2 ** 64)
-        pass
+
 
     """
     Method which instantiates an empty column for each column in the table
@@ -117,10 +133,9 @@ class Table:
     :param columns: []      #the column values
     """
     def add_record(self, *columnValues):
-        # add the four bookkeeping columns to the beginning of columnValues
+        # create the meta column values for this record
         rid = self.get_RID_value()
-
-        col_vals = [0, rid, int(time() * 1000), 0]
+        col_vals = [0, rid, int(time() * 1000000), 0]
 
         for item in columnValues:
             col_vals.append(item)
@@ -144,7 +159,7 @@ class Table:
     :param: key: int                # a primary key value used to find the record
     """
     def delete_record(self, key):
-        # find the RID by the primary key value
+        # find the RID by the key value
         rids = self.column_directory[self.key].index.locate(key)
 
         for rid in rids:
@@ -163,7 +178,7 @@ class Table:
 
     """
     Add an update to a record to the tail pages
-    :param key: int        # the primary key value of the record we are adding an update for
+    :param key: int         # the primary key value of the record we are adding an update for
     :param columns:         # the column values that are being updated
     """
     def update_record(self, key, columns):
@@ -172,42 +187,41 @@ class Table:
 
         # get the base record
         base_record, tail_record = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
-        col_vals = [0] * (len(columns) + 4)
-        col_vals[TIMESTAMP_COLUMN] = int(time() * 1000)
-        col_vals[RID_COLUMN] = LID
-        col_vals[INDIRECTION_COLUMN] = base_record.rid
 
-        schema_encoding = ''
-        for i in range(0, len(columns)):
-            col_vals[i + 4] = columns[i]
-            # if value in column is not 'None' add 1
-            if columns[i]:
-                schema_encoding = schema_encoding + '1'
-            # else add 0
-            else:
-                schema_encoding = schema_encoding + '0'
+        # create the full record as a list
+        col_vals = [base_record.rid, LID, int(time() * 1000000), 0]
 
-        schema_encoding = int(schema_encoding, 2)
+        for item in columns:
+            col_vals.append(item)
+
+        # get schema encoding for updated values
+        schema_encoding = get_schema_encoding(columns)
+
         col_vals[SCHEMA_ENCODING_COLUMN] = schema_encoding
+
         # update indirection column of base record
         self.update_schema_indirection(key, schema_encoding, LID)
 
-        # find the latest record
-        if tail_record:  # latest is a tail record
+        # if the latest record is a tail record
+        if tail_record:
             tail_page_num, tail_offset = self.page_directory.get(tail_record.rid)
-            # update the values in the tail record
-            self.column_directory[INDIRECTION_COLUMN].tail_pages[tail_page_num].data[
-            tail_offset: tail_offset + 8] = struct.pack(ENCODING, LID)
 
-            # for every column we want collect it in our column_values list
+            # update the indirection value in the tail record
+            self.column_directory[INDIRECTION_COLUMN].tail_pages[tail_page_num].data[tail_offset: tail_offset + 8] = struct.pack(ENCODING, LID)
+
+            # for every column, if we have a new value save it, otherwise use old value
             for i in range(4, len(columns) + 4):
-                if col_vals[i] == None:
+                if col_vals[i] is None:
                     col_vals[i] = struct.unpack(ENCODING, tail_record.columns[i])[0]
-        else:  # latest record is base record
+
+        # otherwise the latest record is the base record
+        else:
+            # for every column, if we have a new value save it, otherwise use old value
             for i in range(4, len(columns) + 4):
-                if col_vals[i] == None:
+                if col_vals[i] is None:
                     col_vals[i] = struct.unpack(ENCODING, base_record.columns[i])[0]
 
+        # update page directory
         page_num = offset = -1
         for i in range(0, len(col_vals)):
             page_num, offset = self.column_directory[i].update(col_vals[i])
@@ -220,20 +234,28 @@ class Table:
     :param indirection_value: int                  # the LID of the tail newest tail record for this base record
     """
     def update_schema_indirection(self, key, schema_encoding, indirection_value):
-        # get RID from index
-        # FIXME: how to account for which RID is used.. for now just subscript [0]
-        RID = self.column_directory[self.key].index.locate(value=key)[0]
-        # get page number and offset of record within columns
-        [page_number, offset] = self.page_directory.get(RID)
+        # get a list of rids for all records being updated
+        rids = self.column_directory[self.key].index.locate(value=key)
 
-        # update the values in the base record
-        self.column_directory[INDIRECTION_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(
-            ENCODING, indirection_value)
-        self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(
-            ENCODING, schema_encoding)
+        # for each RID in rids
+        for RID in rids:
+            # get page number and offset of record within columns
+            page_number, offset = self.page_directory.get(RID)
+
+            # update the indirection value in the base record
+            self.column_directory[INDIRECTION_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(ENCODING, indirection_value)
+
+            # get current schema encoding value
+            current_schema_value = struct.unpack(ENCODING, self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number].data[offset: offset + 8])[0]
+
+            # OR current schema encoding value and new schema encoding value
+            schema_encoding |= current_schema_value
+
+            # store new schema encoding value
+            self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(ENCODING, schema_encoding)
 
     """
-    A method which returns a the record with the given primary key
+    A method which returns the record with the given primary key
     :param key: int                    # the primary key for the wanted record
     :param query_columns: []           # a list of integers representing the columns wanted
     """
@@ -242,13 +264,14 @@ class Table:
         column_values = []
         base_record = None
         tail_record = None
+
         # if there is no index for this column yet, create it
         if not self.column_directory[self.key].index:
             self.column_directory[self.key].index = Index(table=self, column_number=self.key)
             self.column_directory[self.key].index.create_index()
 
         # find the RID by the primary key value
-        rid = self.column_directory[self.key].index.locate(key)
+        rid = self.column_directory[self.key].index.locate(value=key)
         if rid:
             rid = rid[0]
 
@@ -256,9 +279,7 @@ class Table:
         if rid and rid != 0:
             # find the base page number and offset in the byte array for the relevant record
             base_page_num, base_offset = self.page_directory.get(rid)
-            lid = struct.unpack(ENCODING,
-                                self.column_directory[INDIRECTION_COLUMN].base_pages[base_page_num].read(base_offset))[
-                0]
+            lid = struct.unpack(ENCODING, self.column_directory[INDIRECTION_COLUMN].base_pages[base_page_num].read(base_offset))[0]
             if lid != 0:
                 tail_page_num, tail_offset = self.page_directory.get(lid)
                 for i in range(len(self.column_directory)):
