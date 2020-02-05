@@ -27,12 +27,12 @@ class Column:
         self.tail_pages = [Page()]
 
     def add(self, col_val):
-        if  not self.base_pages[-1].has_capacity():
+        if not self.base_pages[-1].has_capacity():
             self.base_pages.append(Page())
 
         offset = self.base_pages[-1].write(col_val)
 
-        #returning the page number and offset of new base record
+        # returning the page number and offset of new base record
         return len(self.base_pages) - 1, offset
 
     '''
@@ -41,13 +41,14 @@ class Column:
     new value will be added to a tail_page
     '''
     def update(self, value):
-        #if the current page is full, create a new page
+        # if the current page is full, create a new page
         if not self.tail_pages[-1].has_capacity():
-            #appending new page to the tail_pages array of that column
+            # appending new page to the tail_pages array of that column
             self.tail_pages.append(Page())
 
         offset = self.tail_pages[-1].write(value)
         return len(self.tail_pages) - 1, offset
+
 
 class Table:
     """
@@ -91,7 +92,7 @@ class Table:
         column_directory = []
 
         # create a base page and index for each column
-        for i in range(0, self.num_columns+4):
+        for i in range(0, self.num_columns + 4):
             column_directory.append(Column())
 
         return column_directory
@@ -119,7 +120,7 @@ class Table:
         # add the four bookkeeping columns to the beginning of columnValues
         rid = self.get_RID_value()
 
-        col_vals = [0, rid, int(time()*1000), 0]
+        col_vals = [0, rid, int(time() * 1000), 0]
 
         for item in columnValues:
             col_vals.append(item)
@@ -135,8 +136,8 @@ class Table:
             for i in range(0, len(self.column_directory)):
                 page_num, offset = self.column_directory[i].add(col_vals[i])
                 if self.column_directory[i].index:
-                    column.index.add_index(col_vals[i])
-            self.page_directory.update({rid : [page_num, offset]})
+                    self.column_directory[i].index.add_index(col_vals[i])
+            self.page_directory.update({rid: [page_num, offset]})
 
     """
     A method for deleting lazy deletion of a base record
@@ -144,19 +145,21 @@ class Table:
     """
     def delete_record(self, key):
         # find the RID by the primary key value
-        rid = self.column_directory[self.key].index.locate(key)
-        if rid is None:
-            return "ERROR: key does not exist"
+        rids = self.column_directory[self.key].index.locate(key)
 
-        # find the base page number and offset in byte array for the relevant record
-        page_num, offset = self.page_directory.get(rid)
+        for rid in rids:
+            if rid is None:
+                return "ERROR: key does not exist"
 
-        # for every column set value of record to 0
-        for column in self.column_directory:
-            column.base_pages[page_num].data[offset: offset + 8] = 0
+            # find the base page number and offset in byte array for the relevant record
+            page_num, offset = self.page_directory.get(rid)
 
-        # decrement num of records
-        self.num_records -= 1
+            # for every column set value of record to 0
+            for column in self.column_directory:
+                column.base_pages[page_num].data[offset: offset + 8] = struct.pack(ENCODING, 0)
+
+            # decrement num of records
+            self.num_records -= 1
 
     """
     Add an update to a record to the tail pages
@@ -169,14 +172,14 @@ class Table:
 
         # get the base record
         base_record, tail_record = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
-        col_vals = [0]*(len(columns) + 4)
-        col_vals[TIMESTAMP_COLUMN] = int(time()*1000)
+        col_vals = [0] * (len(columns) + 4)
+        col_vals[TIMESTAMP_COLUMN] = int(time() * 1000)
         col_vals[RID_COLUMN] = LID
         col_vals[INDIRECTION_COLUMN] = base_record.rid
 
         schema_encoding = ''
-        for i in range (0, len(columns)):
-            col_vals[i+4] = columns[i]
+        for i in range(0, len(columns)):
+            col_vals[i + 4] = columns[i]
             # if value in column is not 'None' add 1
             if columns[i]:
                 schema_encoding = schema_encoding + '1'
@@ -186,20 +189,21 @@ class Table:
 
         schema_encoding = int(schema_encoding, 2)
         col_vals[SCHEMA_ENCODING_COLUMN] = schema_encoding
-        #update indirection column of base record
+        # update indirection column of base record
         self.update_schema_indirection(key, schema_encoding, LID)
 
-        #find the latest record
-        if tail_record: #latest is a tail record
+        # find the latest record
+        if tail_record:  # latest is a tail record
             tail_page_num, tail_offset = self.page_directory.get(tail_record.rid)
             # update the values in the tail record
-            self.column_directory[INDIRECTION_COLUMN].tail_pages[tail_page_num].data[tail_offset: tail_offset + 8] = struct.pack(ENCODING, LID)
+            self.column_directory[INDIRECTION_COLUMN].tail_pages[tail_page_num].data[
+            tail_offset: tail_offset + 8] = struct.pack(ENCODING, LID)
 
             # for every column we want collect it in our column_values list
             for i in range(4, len(columns) + 4):
                 if col_vals[i] == None:
                     col_vals[i] = struct.unpack(ENCODING, tail_record.columns[i])[0]
-        else: #latest record is base record
+        else:  # latest record is base record
             for i in range(4, len(columns) + 4):
                 if col_vals[i] == None:
                     col_vals[i] = struct.unpack(ENCODING, base_record.columns[i])[0]
@@ -207,8 +211,7 @@ class Table:
         page_num = offset = -1
         for i in range(0, len(col_vals)):
             page_num, offset = self.column_directory[i].update(col_vals[i])
-        self.page_directory.update({LID : [page_num, offset]})
-
+        self.page_directory.update({LID: [page_num, offset]})
 
     """
     A method which updates the schema and indirection columns of a base record when a tail record is added
@@ -224,8 +227,10 @@ class Table:
         [page_number, offset] = self.page_directory.get(RID)
 
         # update the values in the base record
-        self.column_directory[INDIRECTION_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(ENCODING, indirection_value)
-        self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(ENCODING, schema_encoding)
+        self.column_directory[INDIRECTION_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(
+            ENCODING, indirection_value)
+        self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(
+            ENCODING, schema_encoding)
 
     """
     A method which returns a the record with the given primary key
@@ -251,7 +256,9 @@ class Table:
         if rid and rid != 0:
             # find the base page number and offset in the byte array for the relevant record
             base_page_num, base_offset = self.page_directory.get(rid)
-            lid = struct.unpack(ENCODING, self.column_directory[INDIRECTION_COLUMN].base_pages[base_page_num].read(base_offset))[0]
+            lid = struct.unpack(ENCODING,
+                                self.column_directory[INDIRECTION_COLUMN].base_pages[base_page_num].read(base_offset))[
+                0]
             if lid != 0:
                 tail_page_num, tail_offset = self.page_directory.get(lid)
                 for i in range(len(self.column_directory)):
@@ -277,7 +284,7 @@ class Table:
         sum_col = 0
         if end_range - start_range <= 0:
             return "ERROR: invalid range"
-        query_columns = [0] * (self.num_columns+4)
+        query_columns = [0] * (self.num_columns + 4)
         query_columns[aggr_column_index + 4] = 1
         # go through keys within range
         for key_in_range in range(start_range, end_range + 1):
