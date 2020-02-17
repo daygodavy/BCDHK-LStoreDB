@@ -1,5 +1,5 @@
 from table import Table
-import logging
+from config import *
 
 
 class Database:
@@ -14,32 +14,25 @@ class Database:
     def close(self):
         pass
 
-    def create_table(self, name, num_columns, key):
-        """
-        # Creates a new table
-        :param name: string         #Table name
-        :param num_columns: int     #Number of Columns: all columns are integer
-        :param key: int             #Index of table key in columns
-        """
-        table = Table(name, num_columns, key)
-        return table
 
-    def store_table(self, tobj):
+    def create_table(self, name, key, num_columns):
         """
-        # Stores the specified table with it's name as the key
-        # :param tobj: table object?
+        Creates a new table
+
+        :param name: string         # Table name
+        :param num_columns: int     # Number of Columns: all columns are integer
+        :param key: int             # Index of table key in columns
+
+        :return: table object       # the table object being created
         """
-        self.tables[tobj.name] = tobj
-        print('Successfully stored {} table in Database'.format(self.tables[tobj.name].name))
+        table = Table(name, num_columns, key + NUMBER_OF_META_COLUMNS)
+        return table
 
     def drop_table(self, name):
         """
-        # Deletes the specified table
-        # :param name: string       # the name of the table to be dropped
+        Deletes the specified table
+
+        :param name: string         # The name of the table
         """
-        tobj = self.tables.pop(name, 0)
-        if tobj == 0:
-            print('{} table does not exist'.format(name))
-        else:
-            del tobj
-            print('{} table dropped'.format(name))
+        pass
+      

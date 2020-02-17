@@ -1,5 +1,4 @@
 from config import *
-import struct
 
 
 class Query:
@@ -13,9 +12,8 @@ class Query:
 
     def delete(self, key):
         """
-        internal Method
-
         Read a record with specified RID
+
         :param key: int             # the primary key value of the record to be deleted
         """
         self.table.delete_record(key)
@@ -24,18 +22,19 @@ class Query:
         """
         Insert a record with specified columns
 
-        :param columns:            # the user column values to be saved in the database
+        :param columns: tuple        # the user column values to be saved in the database
         """
-        self.table.add_record(*columns)
+        self.table.add_record(list(columns))
 
-    def select(self, key, query_columns):
+    def select(self, key, column, query_columns):
         """
         Read a record with specified key
 
         :param key: int             # the key value to select records based on
+        :param column: int          # column number to perform query on
         :param query_columns: []    # what columns to return. array of 1 or 0 values
         """
-        return self.table.read_record(key, [0] * 4 + query_columns)
+        return self.table.read_record(key, column, [0] * NUMBER_OF_META_COLUMNS + query_columns)
 
     def update(self, key, *columns):
         """
@@ -54,4 +53,5 @@ class Query:
         :param end_range: int                   # End of the key range to aggregate
         :param aggregate_column_index: int      # Index of desired column to aggregate
         """
-        return self.table.sum_records(start_range, end_range, aggregate_column_index)
+        return self.table.sum_records(start_range, end_range, aggregate_column_index + NUMBER_OF_META_COLUMNS)
+

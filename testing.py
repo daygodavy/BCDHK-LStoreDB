@@ -24,7 +24,7 @@ for i in range(0, 1000):
     print('inserted', records[key])
 
 for key in records:
-    record = query.select(key, [1, 1, 1, 1, 1])[0]
+    record = query.select(key, 4, [1, 1, 1, 1, 1])[0]
     error = False
     for i, column in enumerate(record.columns):
         if column != records[key][i]:
@@ -32,7 +32,7 @@ for key in records:
     if error:
         print('select error on', key , ':', record, ', correct:', records[key])
     else:
-        print('select on', key, ':', record)
+        print('select on', key, ':', record.columns)
 
 for key in records:
     updated_columns = [None, None, None, None, None]
@@ -42,15 +42,15 @@ for key in records:
         original = records[key].copy()
         records[key][i] = value
         query.update(key, *updated_columns)
-        record = query.select(key, [1, 1, 1, 1, 1])[0]
+        record = query.select(key, 4, [1, 1, 1, 1, 1])[0]
         error = False
         for j, column in enumerate(record.columns):
             if column != records[key][j]:
                 error = True
         if error:
-            print('update error on', original, 'and', updated_columns, ':', record, ', correct:', records[key])
+            print('update error on', original, 'and', updated_columns, ':', record.columns, ', correct:', records[key])
         else:
-            print('update on', original, 'and', updated_columns, ':', record)
+            print('update on', original, 'and', updated_columns, ':', record.columns)
         updated_columns[i] = None
 
 keys = sorted(list(records.keys()))
@@ -63,6 +63,3 @@ for c in range(0, grades_table.num_columns):
             print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
         else:
             print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
-
-
-

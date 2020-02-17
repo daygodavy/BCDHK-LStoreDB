@@ -1,81 +1,91 @@
-from config import *
 from BTrees.OOBTree import OOBTree
-import struct
+from config import *
 
 
 class Index:
     """
-    # Indexes the specified column of the specified table to speed up select queries
-    # This data structure is usually a B-Tree
+    Indexes the specified column of the specified table to speed up select queries
+    This data structure is usually a B-Tree
     """
 
-    def __init__(self, table, column_number):
-        self.column_number = column_number
-        self.table = table
-        self.btree = OOBTree()
-        self.rid = 0
+    def __init__(self):
+        # the column this index operates on
+        self.column_number = 0
+
+        # the actual tree that does the work associated with indexing
+        self.index = OOBTree()
+
+        # the table this index operates on
+        self.table = None
 
     def locate(self, value):
         """
-        # returns the location of all records with the given value
-        # :param value: int         # the value to locate RIDs by
+        returns the location of all records with the given value
+
+        :param value: int                     # the value of the key for which we need the RID
         """
-        if self.btree.has_key(value) > 0:
-            return self.btree.get(value)
-        return None
+        return self.index.get(value, False)
 
-    def create_index(self):
+    def create_index(self, table, column_number):
         """
-        # Create index on specific column
+        Create index on specific column
+
+        :param table: table object              # the table the index will operate on
+        :param column_number: int               # the column number in the table the index will operate on
+
+        :return: index object                   # the created index object
         """
-        # populate btree for this column
-        for page in self.table.column_directory[self.column_number].base_pages:
-            # FIXME: AFTER MERGING; this won't work anymore due to assumption of RID ~ idx
-            for i in range(page.num_records):
-                # get starting index of the relevant entry
-                start_idx = i * 8
+        self.table = table
+        self.column_number = column_number
 
-                # update the rid value for the next entry
-                self.rid = self.rid + 1
+        page = 0
+        offset = 0
 
-                # get the entry value itself
-                entry = struct.unpack(ENCODING, page.read(start_idx))[0]
+        # for each page range in the table
+        for page_range in self.table.ranges:
 
-                # check if key exists in btree
-                if self.btree.has_key(entry) > 0:
+            # for each record in the page range
+            for i in range(page_range.num_of_records):
 
-                    # append new rid to the existing entry (key)
-                    rids = self.btree.get(entry)
-                    rids.append(self.rid)
-                    self.btree.update({entry: rids})
+                # get the key for this record relative to the chosen column
+                key = page_range.columns[self.column_number].pages[page].data[offset: offset + 8]
 
-                else:
-                    # create new node { entry : rid }
-                    self.btree.update({entry: [self.rid]})
+                # get the RID for this record
+                RID = page_range.columns[RID_COLUMN].pages[page].data[offset: offset + 8]
 
-    def drop_index(self):
+                # increment the offset
+                offset += 8
+
+                # if reached the end of the page increment page and reset offset
+                if offset == PAGE_SIZE:
+                    page += 1
+                    offset = 0
+
+                self.add_index_item(key, RID)
+
+    def add_index_item(self, key, RID):
         """
-        A method which deletes the index
+        Add to the index the key value and RID pair
+
+        :param key: int                 # the key to store this RID at
+        :param RID: int                 # the RID of the key
         """
-        self.table.index = None
+        # if there are RID/s at this key get them, else false
+        rids = self.index.get(key, False)
 
-    def add_index(self, value):
+        # if there are rids at this key already append the new RID
+        if rids:
+            self.index.update({key: rids.append(RID)})
+            return
+
+        # otherwise add key and RID
+        self.index.update({key: [RID]})
+
+    def drop_index(self, table, column_number):
         """
-        A method which adds a value to the index
-        :param value: int       # the value to be added to the table/index
+        Drop index of specific column
         """
-        # convert value to byte value comparison and addition to byte array
-        # byte_val = struct.pack(ENCODING, value)
-        self.rid = self.rid + 1
-
-        # check if key exists in btree
-        if self.btree.has_key(value):
-
-            # append new rid to the existing entry (key)
-            rids = self.btree.get(value)
-            rids.append(self.rid)
-            self.btree.update({value: rids})
-
-        else:
-            # create new node { entry : rid }
-            self.btree.update({value: [self.rid]})
+        self.table.indexes[self.column_number] = None
+        self.index = None
+        self.table = None
+        self.column_number = 0

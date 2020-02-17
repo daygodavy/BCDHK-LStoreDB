@@ -1,19 +1,267 @@
-from page import Page
-from time import time
-from index import Index
-from config import *
-from BTrees.OOBTree import OOBTree
-import struct
 
-INDIRECTION_COLUMN = 0
-RID_COLUMN = 1
-TIMESTAMP_COLUMN = 2
-SCHEMA_ENCODING_COLUMN = 3
+from range import PageRange
+from time import time
+from BTrees.OOBTree import OOBTree
+from config import *
+from index import Index
+from record import Record
+
+class Table:
+
+    def __init__(self, name, num_columns, key):
+        """
+        The actual table holding the records
+
+        :param name: string         # Table name
+        :param num_columns: int     # Number of user Columns: all columns are integer
+        :param key: int             # Index of primary key column
+        """
+
+        # name of the table
+        self.name = name
+
+        # column number of the primary key column
+        self.prim_key_col_num = key
+
+        # the number user columns
+        self.num_columns = num_columns
+
+        self.number_of_columns = self.num_columns + NUMBER_OF_META_COLUMNS
+
+        # accepts a record's RID and returns page_range_index, page_number and offset
+        self.page_directory = OOBTree()
+
+        # a list containing the page ranges for the table
+        self.ranges = [PageRange(num_columns + NUMBER_OF_META_COLUMNS, key)]
+
+        # the number of records in the tale
+        self.num_records = 0
+
+        # highest used rid number
+        self.rid = 0
+
+        # lowest used lid number
+        self.lid = LID_MAX
+
+        # a list of indexes for the table
+        self.indexes = make_indexes(self.num_columns + NUMBER_OF_META_COLUMNS, self.prim_key_col_num, table=self)
+
+    def get_rid_value(self):
+        """
+        Manage the RIDs of the table
+
+        :return: int                        # an integer value to represent the next RID
+        """
+        self.rid += 1
+        return self.rid
+
+    def get_lid_value(self):
+        """
+        Manage the LIDs of the table
+
+        :return: int                        # an integer value to represent the next LID
+        """
+        self.lid -= 1
+        return self.lid
+
+    def add_record(self, columns):
+        """
+        Add a record to the table
+
+        :param columns: []                  # the column values of the record
+        """
+        # TODO: Check to see if primary key already exists in table
+        #   TA said this error check isn't necessary
+
+        # add meta column values to columns
+        RID = self.get_rid_value()
+        columns = [0, RID, int(time() * 1000000), 0] + columns
+
+        # get a hold of the last page range
+        page_range = self.ranges[-1]
+
+        # if it is full
+        if not page_range.has_capacity:
+            # create a new one and append it
+            page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num)
+            self.ranges.append(page_range)
+
+        # write record to page range and return page number and offset of record
+        page_num, offset = page_range.add_base_record(columns)
+
+        # increment the number of records
+        self.num_records += 1
+
+        # update page directory
+        self.page_directory.update({RID: [len(self.ranges) - 1, page_num, offset]})
+
+        # update primary key index
+        self.indexes[self.prim_key_col_num].add_index_item(columns[self.prim_key_col_num], RID)
+
+    def read_record(self, key, column_number, query_columns):
+        """
+        Read the record from the table
+
+        :param key: int                     # the value to select records based on
+        :param column_number: int           # the column number to match keys on
+        :param query_columns: []            # a list of Nones and 1s defining which column values to return
+
+        :return: []                         # a list of records matching the arguments
+        """
+        # a list to hold the matching records
+        records = []
+
+        # if no index exists for this column, create it
+        index = self.indexes[column_number]
+        if not index:
+            self.indexes[column_number] = index = Index().create_index(table=self, column_number=column_number)
+
+        # get the matching rids
+        rids = index.locate(value=key)
+
+        # if there are no matching rids return an empty list
+        if not rids:
+            return records
+
+        # for each matching record
+        for RID in rids:
+
+            # get the location in the table
+            page_range_num, page_num, offset = self.page_directory.get(RID)
+
+            # check to see if the record has been updated
+            LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+
+            # if it has been updated
+            if LID != 0:
+                # get the updated records location
+                _, page_num, offset = self.page_directory.get(LID)
+
+            # get the record
+            record = self.ranges[page_range_num].read_record([[page_num, offset]], query_columns)
+
+            # append the record to records
+            records = records + record
+
+        # return the records
+        return records
+
+    def update_record(self, key, columns):
+        """
+        Add a tail record for a specific record
+
+        :param key: int                     # the primary key value for finding the record
+        :param columns: []                  # a list of the new values to be added
+        """
+        # create an LID for the tail record
+        LID = self.get_lid_value()
+
+        # get the RID of the base record
+        RID = self.indexes[self.prim_key_col_num].locate(value=key)
+
+        # get the location of the base record
+        page_range_num, page_num, offset = self.page_directory.get(RID[0])
+
+        # get current schema encoding
+        schema_encoding = self.ranges[page_range_num].read_column(page_num, offset, SCHEMA_ENCODING_COLUMN)
+
+        # get the new schema encoding by ORing the new one with the existing one
+        new_schema_encoding = schema_encoding | get_schema_encoding(columns)
+
+        # if there is already a tail record get it's LID
+        indirection_value = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+
+        # update the base record with the new indirection value and schema encoding
+        self.ranges[page_range_num].update_schema_indirection(new_schema_encoding, LID, page_num, offset)
+        if indirection_value:
+            # find it
+            _, page_num, offset = self.page_directory.get(indirection_value, [0, page_num, offset])
+
+        # get the base or tail record
+        # TODO: improve efficiency by only getting record values we need
+        record = self.ranges[page_range_num].read_record([[page_num, offset]], [1] * self.number_of_columns)[0]
+
+        columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding] + list(columns)
+
+        # for every column, if we have a new value save it, otherwise use old value
+        for i in range(NUMBER_OF_META_COLUMNS, len(columns)):
+            if columns[i] is None:
+                columns[i] = record.columns[i]
+
+        # add tail record
+        page_num, offset = self.ranges[page_range_num].add_tail_record(columns)
+
+        # update page directory
+        self.page_directory.update({LID: [page_range_num, page_num, offset]})
+
+    def sum_records(self, start_range, end_range, column_number):
+        """
+        Sum all the records of the given column from the starting rid to the ending rid
+
+        :param start_range: int             # the key of the first record to accumulate
+        :param end_range: int               # the rid of the last record to accumulate(inclusive)
+        :param column_number: int           # the column to accumulate on
+
+        :return: int                        # the outcome of summing all the records
+        """
+        sum = 0
+
+        # TODO: TA said this check isn't necessary
+        # if start_range >= end_range:
+        #     return 0
+
+        # for each possible key within the given range
+        for key_in_range in range(start_range, end_range + 1):
+
+            # get the list of RIDs that match
+            rids = self.indexes[self.prim_key_col_num].locate(key_in_range)
+
+            # if no matching RIDs break from this iteration of the loop
+            if not rids:
+                continue
+
+            # otherwise for every matching RID
+            for RID in rids:
+
+                # get the location of the record and check to see if there has been an update
+                page_range_num, page_num, offset = self.page_directory.get(RID)
+                LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+
+                # if an update get the location of the latest update
+                if LID:
+                    page_range_num, page_num, offset = self.page_directory.get(LID)
+
+                # do the actual summing
+                sum += self.ranges[page_range_num].read_column(page_num, offset, column_number)
+
+        return sum
+
+    def delete_record(self, key):
+        """
+        delete all records with the given primary key
+
+        :param key: int                     # primary key value of the record to be deleted
+        """
+        # get the RID of the record
+        RID = self.indexes[self.prim_key_col_num].locate(key)
+
+        # get the location of the record
+        page_range_num, page_num, offset = self.page_directory.get(RID[0])
+
+        # lazy delete the record
+        self.ranges[page_range_num].delete_record(page_num, offset)
+
+        # modify the number of records in the table
+        self.num_records -= 1
+
+    def __merge(self):
+        pass
 
 
 def get_schema_encoding(columns):
     """
     A method which creates the schema encoding for the given record
+
     :param columns: list            # the record in a list format
     """
     schema_encoding = ''
@@ -27,330 +275,19 @@ def get_schema_encoding(columns):
     return int(schema_encoding, 2)
 
 
-class Record:
-
-    def __init__(self, rid, key, columns):
-        self.rid = rid
-        self.key = key
-        self.columns = columns
-
-
-class Column:
-
-    def __init__(self):
-        self.index = None
-        self.base_pages = [Page()]
-        self.tail_pages = [Page()]
-
-    def add(self, col_val):
-        if not self.base_pages[-1].has_capacity():
-            self.base_pages.append(Page())
-
-        offset = self.base_pages[-1].write(col_val)
-
-        # returning the page number and offset of new base record
-        return len(self.base_pages) - 1, offset
-
-    def update(self, value):
-        """
-        A method which updates an existing record in a column
-
-        :param value: int           # the column value being added
-        :return: int, int           # the page number and offset of the value added to the column
-        """
-        # if the current page is full, create a new page
-        if not self.tail_pages[-1].has_capacity():
-            # appending new page to the tail_pages array of that column
-            self.tail_pages.append(Page())
-
-        offset = self.tail_pages[-1].write(value)
-        return len(self.tail_pages) - 1, offset
-
-
-class Table:
+def make_indexes(number_of_columns, prim_key_column, table):
     """
-    :param name: string         #Table name
-    :param num_columns: int     #Number of Columns: all columns are integer
-    :param key: int             #Index of table key in columns
+    Make a list of empty indices for the table on setup. The primary key column index must always exist so instantiate
+    only this index to begin with.
+
+    :param number_of_columns: int       # the number of columns in the table
+    :param prim_key_column: int         # the index of the primary key column
+    :param table: table object          # the table for which these indexes are being created
+
+    :return: []                         # a list of None with an index in the primary key index index
     """
-
-    def __init__(self, name, num_columns, key):
-        # table name
-        self.name = name
-
-        # column number of primary key
-        self.key = key + 4
-
-        # number of columns in the table
-        # the number is augmented by four for the book keeping columns
-        self.num_columns = num_columns
-
-        # An array of the columns where index is column number
-        # Each element in the array represents a column in the table
-        # columns 0-3 are bookkeeping
-        # the rest of the columns are the user columns
-        self.column_directory = self.make_columns()
-
-        # page directory accepts RID and returns page# and offset of record
-        self.page_directory = OOBTree()
-
-        # number of records in the table
-        self.num_records = 0
-
-        # tail 2^64 - self.tail_record_tracker = number of tail records
-        self.tail_record_tracker = (2 ** 64)
-
-    def make_columns(self):
-        """
-        Method which instantiates an empty column for each column in the table
-
-        :return: list           # a list of column objects that define the table's columns
-        """
-        # the data structure which holds the columns
-        column_directory = []
-
-        # create a base page and index for each column
-        for i in range(0, self.num_columns + 4):
-            column_directory.append(Column())
-
-        return column_directory
-
-    def get_RID_value(self):
-        """
-        A method which manages RIDs for the table
-
-        :return: int            # an RID value
-        """
-        self.num_records += 1
-        return self.num_records
-
-    def get_LID_value(self):
-        """
-        A method which manages the LIDs for the table
-
-        :return: int            # an LID value
-        """
-        self.tail_record_tracker -= 1
-        return self.tail_record_tracker
-
-    def add_record(self, *columnValues):
-        """
-        A method which adds a record to the table
-
-        :param columnValues: tuple          # a tuple of the records user values
-        :return: string                     # an error message
-        """
-        # create the meta column values for this record
-        rid = self.get_RID_value()
-        col_vals = [0, rid, int(time() * 1000000), 0]
-
-        for item in columnValues:
-            col_vals.append(item)
-
-        # if this primary key already exists within the table then reject the addition of this record
-        index = self.column_directory[self.key].index
-        if index and index.locate(col_vals[self.key]):
-            return "ERROR: this primary key already exists within the table"
-
-        # otherwise for each column in the table add the value
-        else:
-            page_num = offset = -1
-            for i in range(0, len(self.column_directory)):
-                page_num, offset = self.column_directory[i].add(col_vals[i])
-                if self.column_directory[i].index:
-                    self.column_directory[i].index.add_index(col_vals[i])
-            self.page_directory.update({rid: [page_num, offset]})
-        return "Success"
-
-    def delete_record(self, key):
-        """
-        A method for the lazy deletion of a record
-
-        :param key: int             # the primary key value of the record to be deleted
-        :return: string             # error message
-        """
-        # find the RID by the key value
-        rids = self.column_directory[self.key].index.locate(key)
-
-        for rid in rids:
-            if rid is None:
-                return "ERROR: key does not exist"
-
-            # find the base page number and offset in byte array for the relevant record
-            page_num, offset = self.page_directory.get(rid)
-
-            # for every column set value of record to 0
-            for column in self.column_directory:
-                column.base_pages[page_num].data[offset: offset + 8] = struct.pack(ENCODING, 0)
-
-            # decrement num of records
-            self.num_records -= 1
-
-    def update_record(self, key, columns):
-        """
-        Add an update to a record to the tail pages
-
-        :param key: int         # the primary key value of the record we are adding an update for
-        :param columns:         # the column values that are being updated
-        """
-        # get LID value
-        LID = self.get_LID_value()
-
-        # get the base record
-        records = self.read_record(key=key, query_columns=[1] * (len(columns) + 4))
-
-        for record in records:
-            # create the full record as a list
-            col_vals = [record.rid, LID, int(time() * 1000000), 0]
-
-            for item in columns:
-                col_vals.append(item)
-
-            # get schema encoding for updated values
-            schema_encoding = get_schema_encoding(columns)
-
-            col_vals[SCHEMA_ENCODING_COLUMN] = schema_encoding
-
-            # update indirection column of base record
-            self.update_schema_indirection(key, schema_encoding, LID)
-
-            # if the latest record is a tail record
-            if record.rid > self.num_records:
-                tail_page_num, tail_offset = self.page_directory.get(record.rid)
-
-                # update the indirection value in the tail record
-                self.column_directory[INDIRECTION_COLUMN].tail_pages[tail_page_num].data[
-                    tail_offset: tail_offset + 8] = struct.pack(ENCODING, LID)
-
-            # for every column, if we have a new value save it, otherwise use old value
-            for i in range(4, len(columns) + 4):
-                if col_vals[i] is None:
-                    col_vals[i] = record.columns[i]
-
-            # update page directory
-            page_num = offset = -1
-            for i in range(0, len(col_vals)):
-                page_num, offset = self.column_directory[i].update(col_vals[i])
-            self.page_directory.update({LID: [page_num, offset]})
-
-    def update_schema_indirection(self, key, schema_encoding, indirection_value):
-        """
-        A method which updates the schema and indirection columns of a base record when a tail record is added
-
-        :param key: int                                # the primary key value of the record we are adding an update for
-        :param schema_encoding: int                    # a value representing which columns have had changes to them
-        :param indirection_value: int                  # the LID of the tail newest tail record for this base record
-        """
-        # get a list of rids for all records being updated
-        rids = self.column_directory[self.key].index.locate(value=key)
-
-        # for each RID in rids
-        for RID in rids:
-            # get page number and offset of record within columns
-            page_number, offset = self.page_directory.get(RID)
-
-            # update the indirection value in the base record
-            self.column_directory[INDIRECTION_COLUMN].base_pages[page_number].data[offset: offset + 8] = struct.pack(
-                ENCODING, indirection_value)
-
-            # get current schema encoding value
-            current_schema_value = struct.unpack(ENCODING, self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[
-                                                               page_number].data[offset: offset + 8])[0]
-
-            # OR current schema encoding value and new schema encoding value
-            schema_encoding |= current_schema_value
-
-            # store new schema encoding value
-            self.column_directory[SCHEMA_ENCODING_COLUMN].base_pages[page_number].data[
-            offset: offset + 8] = struct.pack(ENCODING, schema_encoding)
-
-    def read_record(self, key, query_columns):
-        """
-        A method which returns the record with the given primary key
-
-        :param key: int                    # the primary key for the wanted record
-        :param query_columns: []           # a list of integers representing the columns wanted
-        """
-        # list to hold the wanted column values
-        column_values = []
-
-        # list to hold the records
-        records = []
-
-        # if there is no index for this column yet, create it
-        if not self.column_directory[self.key].index:
-            self.column_directory[self.key].index = Index(table=self, column_number=self.key)
-            self.column_directory[self.key].index.create_index()
-
-        # find the RID by the primary key value
-        rids = self.column_directory[self.key].index.locate(value=key)
-
-        # if there wasn't a match for the primary key return empty-handed
-        if rids is None:
-            return records
-
-        # for all RID values returned from the index
-        for RID in rids:
-
-            # find the base page number and offset in the byte array for the relevant record
-            base_page_num, base_offset = self.page_directory.get(RID)
-
-            # check for tail records
-            lid = struct.unpack(ENCODING, self.column_directory[INDIRECTION_COLUMN].base_pages[base_page_num].read(base_offset))[0]
-            if lid != 0:
-
-                # if tail record/s find the page number and offset
-                tail_page_num, tail_offset = self.page_directory.get(lid)
-
-                # create a record object
-                for i in range(len(self.column_directory)):
-                    if query_columns[i]:
-                        column_values.append(struct.unpack(ENCODING, self.column_directory[i].tail_pages[tail_page_num].read(tail_offset))[0])
-
-                # add it to records
-                records.append(Record(rid=lid, key=key, columns=column_values))
-
-            # otherwise there is only the base record
-            else:
-                # create a record object
-                for i in range(len(self.column_directory)):
-                    if query_columns[i]:
-                        column_values.append(struct.unpack(ENCODING, self.column_directory[i].base_pages[base_page_num].read(base_offset))[0])
-
-                # add it to records
-                records.append(Record(rid=RID, key=key, columns=column_values))
-
-        return records
-
-    def sum_records(self, start_range, end_range, aggr_column_index):
-        """
-        A method which returns a the record with the given primary key
-
-        :param start_range: int            # start of key range
-        :param end_range: int              # end of key range (inclusive)
-        :param aggr_column_index: int      # index of column to aggregate
-        """
-        # instantiate sum
-        sum_col = 0
-
-        # check range for accuracy
-        if end_range - start_range <= 0:
-            return "ERROR: invalid range"
-
-        # create a query_columns object
-        query_columns = [0] * (self.num_columns + 4)
-        query_columns[aggr_column_index + 4] = 1
-
-        # go through keys within range
-        for key_in_range in range(start_range, end_range + 1):
-
-            # get all records that match key_in_range
-            records = self.read_record(key_in_range, query_columns)
-
-            # sum each record that matches key in range
-            for record in records:
-                sum_col += record.columns[0]
-        return sum_col
-
-    def __merge(self):
-        pass
+    indexes = [None] * number_of_columns
+    index = Index()
+    index.create_index(table=table, column_number=prim_key_column)
+    indexes[prim_key_column] = index
+    return indexes
