@@ -21,7 +21,6 @@ class Page:
             return True
         return False
 
-    """
     def write(self, value):
         """
         A method which writes a record value to the page

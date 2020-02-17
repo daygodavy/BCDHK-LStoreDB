@@ -15,7 +15,7 @@ class Database:
         pass
 
 
-    def create_table(self, name, key, num_columns):
+    def create_table(self, name, num_columns, key):
         """
         Creates a new table
 
