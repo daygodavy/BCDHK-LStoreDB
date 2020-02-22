@@ -259,9 +259,39 @@ class Table:
         self.num_records -= 1
 
     def save_table(self, directory_name):
+        """
+         saves table data and page range data to files
+
+         :param directory_name: string       # name of db directory
+         """
+        # write table data to file
         sys.setrecursionlimit(RECURSION_LIMIT)
         with open(os.path.expanduser(directory_name + self.name + '/table'), 'wb+') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+
+        #TODO - think if better way to separate info in file than with spaces
+
+        # write each page range to separate file in same dir
+        for range_i, pg_range in enumerate(self.ranges):
+
+            # open file to write in byte_arrays
+            name = "pageRange" + str(range_i)
+            f = open(os.path.expanduser(directory_name + name + '/table'), 'wb+')
+
+            # iterate through single page range
+            for column in pg_range.columns:
+                for page_i, page in enumerate(column.pages):
+
+                    # add space between base pages and tail pages
+                    if (page_i + 1) == column.last_base_page:
+                        f.write(encode('\n'))
+
+                    # add two spaces between pages
+                    f.write(page + encode('\n'))
+                f.write(encode('\n'))
+
+            # close file for single page range
+            f.close()
 
     def __merge(self):
         pass
