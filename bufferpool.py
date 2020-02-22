@@ -1,4 +1,5 @@
 from config import *
+import os
 
 
 
@@ -10,6 +11,8 @@ class Buff_object:
         self.pin = False
         # page.. page range
         self.object = None
+        self.page_range = 0
+        self.page_num = 0
 
 
 
@@ -19,14 +22,40 @@ class Bufferpool:
         #an array of all bufferpool objects
         self.pool = []
         self.num_of_objects = 0
+        self.table = None
+
+
+    '''
+    Check if object is in bufferpool for retrieval
+    '''
+    # should we pass boolean for read/write to mark it dirty for write?
+    def __check_object(self, page_range, page_num, offset):
+        for i,obj in self.pool:
+            if obj.page_range == page_range and obj.page_num == page_num:
+                # obj found in bufferpool
+                # increment obj num_access
+                obj.num_access += 1
+                # pin the obj
+                obj.pin = True # FIXME: should we pin here?
+                return obj.object
+        # obj not found in bufferpool
+        self.__add_object(page_range, page_num, offset)
+
+
 
     '''
     Adding an object to the bufferpool
     '''
-    def __add_object(self):
+    def __add_object(self, page_range, page_num, offset):
+        # check if bufferpool is full, if so evict
         if self.num_of_objects > BUFFERPOOL_MAX_OBJECTS:
             self.__replace_object(self)
-            #Need to evict 1 onject out, i.e writing it back to the memory
+            # Need to evict 1 onject out, i.e writing it back to the memory
+
+        # retrieve target obj from disk
+        target = "pagerange" + str(page_range)
+        file = open(os.path.expanduser(self.table.directory_name + self.table.name + target), 'rb+')
+        
 
         #append new object
         self.pool.append(Buff_object())
@@ -53,7 +82,7 @@ class Bufferpool:
             if obj.pin is False:
                 unpinned_objs.append(obj)
 
-        # 2)Check number of accesses to determine evicted object
+        # 2)Check number of accesses to determine evicted object (LRU)
         min_access = 999999999999
         min_obj = None
         idx = -1
