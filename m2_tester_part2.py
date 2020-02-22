@@ -1,6 +1,6 @@
-from lstore.db import Database
-from lstore.query import Query
-from lstore.config import init
+from db import Database
+from query import Query
+from config import init
 
 from random import choice, randint, sample, seed
 

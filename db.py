@@ -49,7 +49,7 @@ class Database:
 
         :return: table object       # the table object being created
         """
-        table = Table(name, num_columns, key + NUMBER_OF_META_COLUMNS)
+        table = Table(name, num_columns + NUMBER_OF_META_COLUMNS, key + NUMBER_OF_META_COLUMNS)
         self.tables[name] = table
         return table
 
