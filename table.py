@@ -1,4 +1,7 @@
+import pickle
+import os
 
+import sys
 from range import PageRange
 from time import time
 from BTrees.OOBTree import OOBTree
@@ -253,6 +256,11 @@ class Table:
 
         # modify the number of records in the table
         self.num_records -= 1
+
+    def save_table(self, directory_name):
+        sys.setrecursionlimit(RECURSION_LIMIT)
+        with open(os.path.expanduser(directory_name + self.name + '/table'), 'wb+') as output:
+            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
     def __merge(self):
         pass

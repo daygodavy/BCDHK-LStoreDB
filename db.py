@@ -1,31 +1,43 @@
 import os
+import pickle
 
-from table import Table
 from config import *
+from table import Table
+
 
 class Database:
 
     def __init__(self):
+        # a dictionary of the tables in the database keyed by name
         self.tables = {}
 
-    def open(self, directory_name):
-        # path = directory_name + '/tables'
-        # print("new path: ", path)
-        directory_list = os.listdir(directory_name)
-        print("directory list: ", directory_list)
+        # the directory of the database
+        self.directory_name = "~/ECS165/"
 
-        # for _, name in enumerate(directory_list):
-        #     newpath = path + '/' + name
-        #     self.create_table(newpath)
+    def open(self, directory_name):
+        """
+        Start the database from the given directory
+
+        :param directory_name: str      # a string representing the directory of the database
+        """
+        self.directory_name = directory_name + '/'
+        print("database opened")
+        self.instantiate_tables()
+
+    def instantiate_tables(self):
+        """
+        Go through database folder and instantiate table objects
+        """
+        for name, table in self.tables.items():
+            table_file = os.path.expanduser(self.directory_name + name + '/table')
+            pickle.load(open(table_file, "rb"))
 
     def close(self):
-        pass
-
-    def get_table(self, name):
         """
-        # Returns table with the passed name
+        Close the db and save the table
         """
-        return self.tables(name)
+        for name, table in self.tables.items():
+            table.save_table(self.directory_name)
 
     def create_table(self, name, num_columns, key):
         """
@@ -38,7 +50,8 @@ class Database:
         :return: table object       # the table object being created
         """
         table = Table(name, num_columns, key + NUMBER_OF_META_COLUMNS)
-        self.tables[table.name] = table
+        self.tables[name] = table
+        return table
 
     def drop_table(self, name):
         """
@@ -46,16 +59,8 @@ class Database:
 
         :param name: string         # The name of the table
         """
-        tobj = self.tables.pop(name, 0)
-        if tobj == 0:
-            print('{} table does not exist'.format(name))
+        table_object = self.tables.pop(name, 0)
+        if table_object == 0:
+            print(name + ' does not exist')
         else:
-            del tobj
-            print('{} table dropped'.format(name))
-
-
-db = Database()
-db.open('~/ECS165')
-# tbl = db.create_table('Users', 2, 0)
-# db.drop_table('Users')
-# db.get_table('test.txt')
+            print(name + " has been dropped")
