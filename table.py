@@ -7,7 +7,6 @@ from time import time
 from BTrees.OOBTree import OOBTree
 from config import *
 from index import Index
-from record import Record
 
 
 class Table:
@@ -25,18 +24,19 @@ class Table:
         self.name = name
 
         # column number of the primary key column
-        self.prim_key_col_num = key
+        self.prim_key_col_num = key + NUMBER_OF_META_COLUMNS
 
         # the number user columns
         self.num_columns = num_columns
 
-        self.number_of_columns = self.num_columns
+        # the total number of columns
+        self.number_of_columns = self.num_columns +NUMBER_OF_META_COLUMNS
 
         # accepts a record's RID and returns page_range_index, page_number and offset
         self.page_directory = OOBTree()
 
         # a list containing the page ranges for the table
-        self.ranges = [PageRange(num_columns, key)]
+        self.ranges = [PageRange(self.number_of_columns, key)]
 
         # the number of records in the tale
         self.num_records = 0
