@@ -1,4 +1,5 @@
 import os
+import glob
 import pickle
 
 from config import *
@@ -20,17 +21,16 @@ class Database:
 
         :param directory_name: str      # a string representing the directory of the database
         """
-        self.directory_name = directory_name + '/'
-        print("database opened")
-        self.instantiate_tables()
+        self.directory_name = os.path.expanduser(directory_name) + '/'
 
-    def instantiate_tables(self):
-        """
-        Go through database folder and instantiate table objects
-        """
-        for name, table in self.tables.items():
-            table_file = os.path.expanduser(self.directory_name + name + '/table')
-            pickle.load(open(table_file, "rb"))
+        # for each table in the database folder
+        for _, name in enumerate(glob.glob(self.directory_name + "/*", recursive=True)):
+            print("name : ", name)
+            table_file = name + '/table'
+            table = pickle.load(open(table_file, "rb"))
+            self.tables[table.name] = table
+
+        print("database opened")
 
     def close(self):
         """
@@ -63,4 +63,5 @@ class Database:
         if table_object == 0:
             print(name + ' does not exist')
         else:
+            # TODO: delete files off computer
             print(name + " has been dropped")
