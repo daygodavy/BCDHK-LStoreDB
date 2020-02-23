@@ -151,4 +151,3 @@ def make_columns(number_of_columns):
     for i in range(number_of_columns):
         columns.append(Column())
     return columns
-

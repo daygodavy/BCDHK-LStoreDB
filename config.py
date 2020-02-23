@@ -6,6 +6,7 @@ import struct
 def init():
     pass
 
+
 def encode(value):
     return struct.pack(ENCODING, value)
 

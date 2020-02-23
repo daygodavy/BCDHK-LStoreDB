@@ -1,6 +1,7 @@
 import os
 import glob
 import pickle
+import shutil
 
 from config import *
 from table import Table
@@ -63,5 +64,5 @@ class Database:
         if table_object == 0:
             print(name + ' does not exist')
         else:
-            # TODO: delete files off computer
+            shutil.rmtree(self.directory_name + name)
             print(name + " has been dropped")

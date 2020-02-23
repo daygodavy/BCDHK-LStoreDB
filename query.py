@@ -54,4 +54,3 @@ class Query:
         :param aggregate_column_index: int      # Index of desired column to aggregate
         """
         return self.table.sum_records(start_range, end_range, aggregate_column_index + NUMBER_OF_META_COLUMNS)
-

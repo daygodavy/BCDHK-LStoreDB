@@ -48,10 +48,10 @@ class Index:
             for i in range(page_range.num_of_records):
 
                 # get the key for this record relative to the chosen column
-                key = decode(page_range.columns[self.column_number].pages[page].data[offset: offset + 8])
+                key = page_range.columns[self.column_number].pages[page].read(offset)
 
                 # get the RID for this record
-                RID = decode(page_range.columns[RID_COLUMN].pages[page].data[offset: offset + 8])
+                RID = page_range.columns[RID_COLUMN].pages[page].read(offset)
 
                 # increment the offset
                 offset += 8

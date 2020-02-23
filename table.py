@@ -30,7 +30,7 @@ class Table:
         self.num_columns = num_columns
 
         # the total number of columns
-        self.number_of_columns = self.num_columns +NUMBER_OF_META_COLUMNS
+        self.number_of_columns = self.num_columns + NUMBER_OF_META_COLUMNS
 
         # accepts a record's RID and returns page_range_index, page_number and offset
         self.page_directory = OOBTree()
@@ -269,26 +269,27 @@ class Table:
         with open(os.path.expanduser(directory_name + self.name + '/table'), 'wb+') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
-        #TODO - think if better way to separate info in file than with spaces
+        # TODO - think if better way to separate info in file than with spaces
 
         # write each page range to separate file in same dir
         for range_i, pg_range in enumerate(self.ranges):
 
             # open file to write in byte_arrays
             name = "pageRange" + str(range_i)
-            f = open(os.path.expanduser(directory_name + name + '/table'), 'wb+')
+            f = open(os.path.expanduser(directory_name + '/' + self.name + '/' + name), 'wb+')
 
             # iterate through single page range
             for column in pg_range.columns:
                 for page_i, page in enumerate(column.pages):
 
                     # add space between base pages and tail pages
-                    if (page_i + 1) == column.last_base_page:
-                        f.write(encode('\n'))
+                    # if (page_i + 1) == column.last_base_page:
+                        # f.write(encode('\n'))
 
+                    f.write(page.data)
                     # add two spaces between pages
-                    f.write(page + encode('\n'))
-                f.write(encode('\n'))
+                    # f.write(encode('\n'))
+                # f.write(encode('\n'))
 
             # close file for single page range
             f.close()
