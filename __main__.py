@@ -36,7 +36,7 @@ print("Updating 10k records took:  \t\t\t", update_time_1 - update_time_0)
 # Measuring Select Performance
 select_time_0 = process_time()
 for i in range(0, 10000):
-    query.select(choice(keys), 4, [1, 1, 1, 1, 1])
+    query.select(choice(keys), 0, [1, 1, 1, 1, 1])
 select_time_1 = process_time()
 print("Selecting 10k records took:  \t\t\t", select_time_1 - select_time_0)
 
@@ -53,3 +53,6 @@ for i in range(0, 10000):
     query.delete(906659671 + i)
 delete_time_1 = process_time()
 print("Deleting 10k records took:  \t\t\t", delete_time_1 - delete_time_0)
+
+db.close()
+db.open("~/ECS165")

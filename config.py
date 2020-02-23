@@ -6,6 +6,7 @@ import struct
 def init():
     pass
 
+
 def encode(value):
     return struct.pack(ENCODING, value)
 
@@ -26,3 +27,5 @@ PAGE_RANGE_SIZE = 10000
 LID_MAX = (2 ** 64)
 ENCODED_ZERO = encode(0)
 NUMBER_OF_META_COLUMNS = 4
+
+RECURSION_LIMIT = 7000

@@ -34,7 +34,7 @@ class Query:
         :param column: int          # column number to perform query on
         :param query_columns: []    # what columns to return. array of 1 or 0 values
         """
-        return self.table.read_record(key, column, [0] * NUMBER_OF_META_COLUMNS + query_columns)
+        return self.table.read_record(key, column + NUMBER_OF_META_COLUMNS, [0] * NUMBER_OF_META_COLUMNS + query_columns)
 
     def update(self, key, *columns):
         """
@@ -54,4 +54,3 @@ class Query:
         :param aggregate_column_index: int      # Index of desired column to aggregate
         """
         return self.table.sum_records(start_range, end_range, aggregate_column_index + NUMBER_OF_META_COLUMNS)
-
