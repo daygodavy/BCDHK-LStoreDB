@@ -23,7 +23,7 @@ class PageRange:
         self.num_pages = -1
 
         # the columns of the page range
-        self.columns = self.make_columns(self.num_of_columns)
+        self.columns = self.make_columns(number_of_columns=self.num_of_columns)
 
         # the number of records in the page range
         self.num_of_records = 0
@@ -33,6 +33,9 @@ class PageRange:
         target = directory_name + '/pageRange' + str(self.my_index)
         if not os.path.isdir(target):
             os.mkdir(target)
+
+        # the number of updates to the page range
+        self.update_count = 0
 
     def add_base_record(self, columns):
         """
@@ -111,7 +114,9 @@ class PageRange:
         page_number = 0
         offset = 0
         for i, column in enumerate(self.columns):
-            page_number, offset = column.add_tail_value(columns[i], self)
+            page_number, offset = column.add_tail_value(value=columns[i])
+        self.update_count += 1
+
         return page_number, offset
 
     def delete_record(self, page_num, offset):
@@ -149,11 +154,19 @@ class PageRange:
         else:
             return False
 
+    def check_threshold(self):
+        if self.update_count >= UPDATE_THRESHOLD:
+            return True
+        return False
+
+    def get_page_number(self):
+        self.num_pages += 1
+        return self.num_pages
+
     def make_columns(self, number_of_columns):
         """
         Make the starting empty columns for the page range
 
-        :param page_range_number:
         :param number_of_columns: int           # the number of columns in the table
 
         :return: []                             # a list of columns
@@ -162,7 +175,3 @@ class PageRange:
         for i in range(number_of_columns):
             columns.append(Column(column_number=i, page_range=self, page_number=self.get_page_number()))
         return columns
-
-    def get_page_number(self):
-        self.num_pages += 1
-        return self.num_pages

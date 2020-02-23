@@ -204,6 +204,10 @@ class Table:
         # update page directory
         self.page_directory.update({LID: [page_range_num, page_num, offset]})
 
+        # check if we've reached update threshold
+        if self.ranges[page_range_num].check_threshold():
+            self.merge(self.ranges[page_range_num])
+
     def sum_records(self, start_range, end_range, column_number):
         """
         Sum all the records of the given column from the starting rid to the ending rid
@@ -277,40 +281,44 @@ class Table:
 
         bp.close()
 
-    def __merge(self):
+    def __merge(self, page_range):
+        # page_range.read_record
+        # make a new page range. iterate through base records, copying needed records into new page range.
+        # when done, append new page range object to self.ranges.
+        # get that range index and update the page directory for affected records.
         pass
 
 
-def get_schema_encoding(columns):
-    """
-    A method which creates the schema encoding for the given record
+    def get_schema_encoding(columns):
+        """
+        A method which creates the schema encoding for the given record
 
-    :param columns: list            # the record in a list format
-    """
-    schema_encoding = ''
-    for item in columns:
-        # if value in column is not 'None' add 1
-        if item:
-            schema_encoding = schema_encoding + '1'
-        # else add 0
-        else:
-            schema_encoding = schema_encoding + '0'
-    return int(schema_encoding, 2)
+        :param columns: list            # the record in a list format
+        """
+        schema_encoding = ''
+        for item in columns:
+            # if value in column is not 'None' add 1
+            if item:
+                schema_encoding = schema_encoding + '1'
+            # else add 0
+            else:
+                schema_encoding = schema_encoding + '0'
+        return int(schema_encoding, 2)
 
 
-def make_indexes(number_of_columns, prim_key_column, table):
-    """
-    Make a list of empty indices for the table on setup. The primary key column index must always exist so instantiate
-    only this index to begin with.
+    def make_indexes(number_of_columns, prim_key_column, table):
+        """
+        Make a list of empty indices for the table on setup. The primary key column index must always exist so instantiate
+        only this index to begin with.
 
-    :param number_of_columns: int       # the number of columns in the table
-    :param prim_key_column: int         # the index of the primary key column
-    :param table: table object          # the table for which these indexes are being created
+        :param number_of_columns: int       # the number of columns in the table
+        :param prim_key_column: int         # the index of the primary key column
+        :param table: table object          # the table for which these indexes are being created
 
-    :return: []                         # a list of None with an index in the primary key index index
-    """
-    indexes = [None] * number_of_columns
-    index = Index()
-    index.create_index(table=table, column_number=prim_key_column)
-    indexes[prim_key_column] = index
-    return indexes
+        :return: []                         # a list of None with an index in the primary key index index
+        """
+        indexes = [None] * number_of_columns
+        index = Index()
+        index.create_index(table=table, column_number=prim_key_column)
+        indexes[prim_key_column] = index
+        return indexes
