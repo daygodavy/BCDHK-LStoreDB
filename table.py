@@ -9,6 +9,7 @@ from config import *
 from index import Index
 from bufferpool import bp
 
+
 class Table:
 
     def __init__(self, name, num_columns, key):
@@ -48,7 +49,7 @@ class Table:
         self.lid = LID_MAX
 
         # a list of indexes for the table
-        self.indexes = make_indexes(self.num_columns, self.prim_key_col_num, table=self)
+        self.indexes = self.make_indexes(self.num_columns, self.prim_key_col_num, table=self)
 
         # name of directory that table is in
         self.directory_name = "~/ECS165/"
@@ -82,7 +83,7 @@ class Table:
 
         # add meta column values to columns
         RID = self.get_rid_value()
-        columns = [0, RID, int(time() * 1000000), 0] + columns
+        columns = [0, RID, int(time() * 1000000), 0, 0] + columns
 
         # get a hold of the last page range
         page_range = self.ranges[-1]
@@ -141,7 +142,6 @@ class Table:
 
             # if it has been updated
             if LID != 0:
-
                 # get the updated records location
                 _, page_num, offset = self.page_directory.get(LID)
 
@@ -171,13 +171,15 @@ class Table:
         page_range_num, page_num, offset = self.page_directory.get(RID[0])
 
         # get current schema encoding
-        schema_encoding = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, SCHEMA_ENCODING_COLUMN)
+        schema_encoding = self.ranges[page_range_num].read_column(page_range_num, page_num, offset,
+                                                                  SCHEMA_ENCODING_COLUMN)
 
         # get the new schema encoding by ORing the new one with the existing one
         new_schema_encoding = schema_encoding | get_schema_encoding(columns)
 
         # if there is already a tail record get it's LID
-        indirection_value = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
+        indirection_value = self.ranges[page_range_num].read_column(page_range_num, page_num, offset,
+                                                                    INDIRECTION_COLUMN)
 
         # update the base record with the new indirection value and schema encoding
         self.ranges[page_range_num].update_schema_indirection(new_schema_encoding, LID, page_num, offset)
@@ -189,9 +191,11 @@ class Table:
 
         # get the base or tail record
         # TODO: improve efficiency by only getting record values we need
-        record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[0]
+        record = \
+            self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[
+                0]
 
-        columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding] + list(columns)
+        columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding, RID] + list(columns)
 
         # for every column, if we have a new value save it, otherwise use old value
         for i in range(NUMBER_OF_META_COLUMNS, len(columns)):
@@ -265,6 +269,7 @@ class Table:
         # lazy delete the record
         self.ranges[page_range_num].delete_record(page_num, offset)
 
+        # TODO: why do we need to know how many valid records there are versus total records (valid+invalid) - terri and katya
         # modify the number of records in the table
         self.num_records -= 1
 
@@ -281,44 +286,87 @@ class Table:
 
         bp.close()
 
-    def __merge(self, page_range):
-        # page_range.read_record
-        # make a new page range. iterate through base records, copying needed records into new page range.
-        # when done, append new page range object to self.ranges.
-        # get that range index and update the page directory for affected records.
-        pass
+    def __merge(self, original_page_range):
+
+        original_page_range.merge = True
+
+        copy_page_range = PageRange(self.number_of_columns, self.prim_key_col_num)
+
+        num_of_base_pages = original_page_range.columns.last_base_page + 1
+
+        for i, col in enumerate(original_page_range.columns):
+            for n in range(num_of_base_pages):
+                copy_page_range.columns[i].pages.append(original_page_range.columns[i].pages[n])
+
+        # dictionary of RIDs we've seen so far
+        has_seen = []
+
+        iterate_offset = PAGE_SIZE
+        for tail_num in range(original_page_range.tps + 1, -1, -2):
+            for i in range(RECORDS_PER_PAGE + 1):
+                iterate_offset -= 8
+                # return user data and rid column
+                record = original_page_range.read_record([tail_num, iterate_offset],
+                                                         ([0] * (NUMBER_OF_META_COLUMNS - 1)) + (
+                                                                 [1] * self.num_columns))
+                base_rid = record.columns[BASE_RID]
+                if not (base_rid in has_seen):
+                    has_seen.append(base_rid)
+                    _, page_num, offset = self.page_directory[base_rid]
+                    # ignore meta data columns and copy just the user data over
+                    for n, column in enumerate(copy_page_range.columns, start=NUMBER_OF_META_COLUMNS):
+                        column.update_value((page_num, offset, record.columns[n]))
+
+                if len(has_seen) == self.rid:
+                    break
+
+        # append remaining tail page to copy page
+        for i, col in enumerate(original_page_range.columns):
+            copy_page_range.columns[i].pages.append(original_page_range.columns[i].pages[-1])
+
+        # update range and get new index to update page directory
+        self.ranges.append(copy_page_range)
+        range_index = len(self.ranges) - 1
+
+        # update page directory to point to new merged pages
+        for rid in has_seen:
+            _, page_num, offset = self.page_directory[rid]
+            values = [range_index, page_num, offset]
+            self.page_directory[rid] = values
+
+        original_page_range.merge = False
 
 
-    def get_schema_encoding(columns):
-        """
-        A method which creates the schema encoding for the given record
+def get_schema_encoding(columns):
+    """
+    A method which creates the schema encoding for the given record
 
-        :param columns: list            # the record in a list format
-        """
-        schema_encoding = ''
-        for item in columns:
-            # if value in column is not 'None' add 1
-            if item:
-                schema_encoding = schema_encoding + '1'
-            # else add 0
-            else:
-                schema_encoding = schema_encoding + '0'
-        return int(schema_encoding, 2)
+    :param columns: list            # the record in a list format
+    """
+    schema_encoding = ''
+    for item in columns:
+        # if value in column is not 'None' add 1
+        if item:
+            schema_encoding = schema_encoding + '1'
+        # else add 0
+        else:
+            schema_encoding = schema_encoding + '0'
+    return int(schema_encoding, 2)
 
 
-    def make_indexes(number_of_columns, prim_key_column, table):
-        """
-        Make a list of empty indices for the table on setup. The primary key column index must always exist so instantiate
-        only this index to begin with.
+def make_indexes(number_of_columns, prim_key_column, table):
+    """
+    Make a list of empty indices for the table on setup. The primary key column index must always exist so instantiate
+    only this index to begin with.
 
-        :param number_of_columns: int       # the number of columns in the table
-        :param prim_key_column: int         # the index of the primary key column
-        :param table: table object          # the table for which these indexes are being created
+    :param number_of_columns: int       # the number of columns in the table
+    :param prim_key_column: int         # the index of the primary key column
+    :param table: table object          # the table for which these indexes are being created
 
-        :return: []                         # a list of None with an index in the primary key index index
-        """
-        indexes = [None] * number_of_columns
-        index = Index()
-        index.create_index(table=table, column_number=prim_key_column)
-        indexes[prim_key_column] = index
-        return indexes
+    :return: []                         # a list of None with an index in the primary key index index
+    """
+    indexes = [None] * number_of_columns
+    index = Index()
+    index.create_index(table=table, column_number=prim_key_column)
+    indexes[prim_key_column] = index
+    return indexes

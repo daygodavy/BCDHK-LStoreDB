@@ -37,6 +37,9 @@ class PageRange:
         # the number of updates to the page range
         self.update_count = 0
 
+        # want one merge to occur at once
+        self.merge = False
+
     def add_base_record(self, columns):
         """
         Add a record to the page range
@@ -129,6 +132,7 @@ class PageRange:
         for column in self.columns:
             column.delete(page_num, offset)
 
+        # TODO: shouldn't decrement record count - terri and katya
         self.num_of_records -= 1
 
     def update_schema_indirection(self, encoding, indirection_value, page_num, offset):
@@ -154,11 +158,6 @@ class PageRange:
         else:
             return False
 
-    def check_threshold(self):
-        if self.update_count >= UPDATE_THRESHOLD:
-            return True
-        return False
-
     def get_page_number(self):
         self.num_pages += 1
         return self.num_pages
@@ -175,3 +174,11 @@ class PageRange:
         for i in range(number_of_columns):
             columns.append(Column(column_number=i, page_range=self, page_number=self.get_page_number()))
         return columns
+
+    def check_threshold(self):
+        """
+        Check if we reached the update threshold and have full base pages to trigger a merge.
+        """
+        if self.update_count >= UPDATE_THRESHOLD and self.num_of_records % RECORDS_PER_PAGE == 0 and self.merge == False:
+            return True
+        return False
