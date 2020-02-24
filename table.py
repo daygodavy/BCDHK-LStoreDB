@@ -206,7 +206,7 @@ class Table:
             self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[
                 0]
 
-        columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding, RID] + list(columns)
+        columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding, RID[0]] + list(columns)
 
         # for every column, if we have a new value save it, otherwise use old value
         for i in range(NUMBER_OF_META_COLUMNS, len(columns)):

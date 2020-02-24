@@ -8,7 +8,6 @@ def init():
 
 
 def encode(value):
-    print("value: ", value)
     return struct.pack(ENCODING, value)
 
 
