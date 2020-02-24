@@ -40,6 +40,9 @@ class PageRange:
         # want one merge to occur at once
         self.merge = False
 
+        # num of last tail page in prev update range
+        self.tps = 0
+
     def add_base_record(self, columns):
         """
         Add a record to the page range
@@ -179,6 +182,6 @@ class PageRange:
         """
         Check if we reached the update threshold and have full base pages to trigger a merge.
         """
-        if self.update_count >= UPDATE_THRESHOLD and self.num_of_records % RECORDS_PER_PAGE == 0 and self.merge == False:
+        if self.update_count >= UPDATE_THRESHOLD and self.num_of_records % RECORDS_PER_PAGE == 0 and not self.merge:
             return True
         return False
