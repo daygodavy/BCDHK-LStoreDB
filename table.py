@@ -327,10 +327,6 @@ class Table:
                 if len(has_seen) == self.rid:
                     break
 
-        # # append remaining tail page to copy page range
-        # for i, col in enumerate(original_page_range.columns):
-        #     copy_page_range.columns[i].pages.append(original_page_range.columns[i].pages[-1])
-
         # append tail pages to copy of page range
         for i, col in enumerate(original_page_range.columns):
             for n in range(num_of_tail_pages):
