@@ -49,7 +49,7 @@ class Table:
         self.lid = LID_MAX
 
         # a list of indexes for the table
-        self.indexes = self.make_indexes(self.num_columns, self.prim_key_col_num, table=self)
+        self.indexes = self.make_indexes(self.number_of_columns, self.prim_key_col_num, table=self)
 
         # name of directory that table is in
         self.directory_name = "~/ECS165/"
@@ -186,7 +186,7 @@ class Table:
                                                                   SCHEMA_ENCODING_COLUMN)
 
         # get the new schema encoding by ORing the new one with the existing one
-        new_schema_encoding = schema_encoding | get_schema_encoding(columns)
+        new_schema_encoding = schema_encoding | self.get_schema_encoding(columns)
 
         # if there is already a tail record get it's LID
         indirection_value = self.ranges[page_range_num].read_column(page_range_num, page_num, offset,
