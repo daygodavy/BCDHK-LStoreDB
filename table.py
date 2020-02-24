@@ -288,12 +288,17 @@ class Table:
 
     def __merge(self, original_page_range):
 
+        # beginning merge on this page range
         original_page_range.merge = True
 
+        # create a copy of the page range
         copy_page_range = PageRange(self.number_of_columns, self.prim_key_col_num)
 
-        num_of_base_pages = original_page_range.columns.last_base_page + 1
+        # num of base, tail pages of original to create copy
+        num_of_base_pages = original_page_range.columns[0].last_base_page + 1
+        num_of_tail_pages = original_page_range.columns[0].last_page - original_page_range.columns[0].last_base_page
 
+        # copy base pages to the copy page range
         for i, col in enumerate(original_page_range.columns):
             for n in range(num_of_base_pages):
                 copy_page_range.columns[i].pages.append(original_page_range.columns[i].pages[n])
@@ -301,9 +306,10 @@ class Table:
         # dictionary of RIDs we've seen so far
         has_seen = []
 
+        # iterate through all tail pages except last, check for last update to record
         iterate_offset = PAGE_SIZE
         for tail_num in range(original_page_range.tps + 1, -1, -2):
-            for i in range(RECORDS_PER_PAGE + 1):
+            for i in range(RECORDS_PER_PAGE):
                 iterate_offset -= 8
                 # return user data and rid column
                 record = original_page_range.read_record([tail_num, iterate_offset],
@@ -317,12 +323,21 @@ class Table:
                     for n, column in enumerate(copy_page_range.columns, start=NUMBER_OF_META_COLUMNS):
                         column.update_value((page_num, offset, record.columns[n]))
 
+                # if have seen all rids in base pages, break since found all latest updates
                 if len(has_seen) == self.rid:
                     break
 
-        # append remaining tail page to copy page
+        # # append remaining tail page to copy page range
+        # for i, col in enumerate(original_page_range.columns):
+        #     copy_page_range.columns[i].pages.append(original_page_range.columns[i].pages[-1])
+
+        # append tail pages to copy of page range
         for i, col in enumerate(original_page_range.columns):
-            copy_page_range.columns[i].pages.append(original_page_range.columns[i].pages[-1])
+            for n in range(num_of_tail_pages):
+                copy_page_range.columns[i].pages.append(original_page_range.columns[i].pages[n])
+
+        # update tps of copy of page range
+        copy_page_range.tps = copy_page_range.columns[0].last_page - 1
 
         # update range and get new index to update page directory
         self.ranges.append(copy_page_range)
@@ -334,6 +349,7 @@ class Table:
             values = [range_index, page_num, offset]
             self.page_directory[rid] = values
 
+        # finished merging this page range
         original_page_range.merge = False
 
 
