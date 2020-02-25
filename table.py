@@ -57,7 +57,6 @@ class Table:
         # stack of deleted, available RIDs
         self.rid_stack = []
 
-
     def get_rid_value(self):
         """
         Manage the RIDs of the table
@@ -145,18 +144,20 @@ class Table:
         for RID in rids:
 
             # get the location in the table
-            page_range, page_num, offset = self.page_directory.get(RID)
+            page_range_num, page_num, offset = self.page_directory.get(RID)
 
+            # TODO - double check that logic is correct
             # check to see if the record has been updated
-            LID = self.ranges[page_range].read_column(page_range, page_num, offset, INDIRECTION_COLUMN)
+            LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+            tps = self.ranges[page_num].tps
 
             # if it has been updated
-            if LID != 0:
+            if LID > tps:
                 # get the updated records location
                 _, page_num, offset = self.page_directory.get(LID)
 
             # get the record
-            record = self.ranges[page_range].read_record([[page_range, page_num, offset]], query_columns)
+            record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], query_columns)
 
             # append the record to records
             records = records + record
@@ -325,16 +326,22 @@ class Table:
             for i in range(RECORDS_PER_PAGE):
                 iterate_offset -= 8
                 # return user data and rid column
-                record = original_page_range.read_record([tail_num, iterate_offset],
-                                                         ([0] * (NUMBER_OF_META_COLUMNS - 1)) + (
-                                                                 [1] * self.num_columns))
+                record = original_page_range.read_record([tail_num, iterate_offset], [1] * self.number_of_columns)
                 base_rid = record.columns[BASE_RID]
                 if not (base_rid in has_seen):
                     has_seen.append(base_rid)
+
                     _, page_num, offset = self.page_directory[base_rid]
+
                     # ignore meta data columns and copy just the user data over
                     for n, column in enumerate(copy_page_range.columns, start=NUMBER_OF_META_COLUMNS):
                         column.update_value((page_num, offset, record.columns[n]))
+
+                    # TODO - double check that correct
+
+                    # edit base record's meta data columns accordingly
+                    copy_page_range.columns[INDIRECTION_COLUMN].update_value(page_num, offset, 0)
+                    copy_page_range.columns[SCHEMA_ENCODING_COLUMN].update_value(page_num, offset, 0)
 
                 # if have seen all rids in base pages, break since found all latest updates
                 if len(has_seen) == self.rid:
