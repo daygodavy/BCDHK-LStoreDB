@@ -98,7 +98,7 @@ class Table:
             self.ranges.append(page_range)
 
         # write record to page range and return page number and offset of record
-        page_num, offset = page_range.add_base_record(columns, page_range, self.bp)
+        page_num, offset = page_range.add_base_record(columns, page_range)
 
         # increment the number of records
         self.num_records += 1

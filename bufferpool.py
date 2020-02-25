@@ -1,6 +1,7 @@
 from config import *
 import os
 from page import *
+from collections import defaultdict
 
 
 # we dont know either if it's page or page range
@@ -19,7 +20,7 @@ class Bufferpool:
 
     def __init__(self):
         # an array of all bufferpool objects
-        self.pool = []
+        self.pool = defaultdict(int)
         self.num_of_objects = 0
         self.table = None
 
@@ -41,6 +42,10 @@ class Bufferpool:
                 return obj
         # obj not found in bufferpool so grab from disk
         print("NOT ON DISK")
+
+
+        
+
         return self.__add_object(page_range, page_num)
 
     '''
@@ -141,3 +146,6 @@ class Bufferpool:
         obj.dirty = True
         obj.object.overwrite(offset=offset, value=val)
         obj.pin = False
+
+
+bp = Bufferpool()

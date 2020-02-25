@@ -4,6 +4,7 @@ from record import Record
 
 
 class PageRange:
+    id = 0
 
     def __init__(self, num_of_columns, primary_key_column):
         """
@@ -25,7 +26,9 @@ class PageRange:
         # the number of records in the page range
         self.num_of_records = 0
 
-    def add_base_record(self, columns):
+        self.id = PageRange.id + 1
+
+    def add_base_record(self, columns, page_range):
         """
         Add a record to the page range
 
@@ -85,7 +88,7 @@ class PageRange:
 
         :return: int                        # the record value
         """
-        return self.columns[column_number].read(page_number=page_number, offset=offset)
+        return self.columns[column_number].read(page_number=page_number, offset=offset, page_range=id)
 
     def add_tail_record(self, columns):
         """
