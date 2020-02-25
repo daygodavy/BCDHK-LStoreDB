@@ -5,7 +5,7 @@ import shutil
 
 from config import *
 from table import Table
-
+from bufferpool import *
 
 class Database:
 
@@ -15,6 +15,9 @@ class Database:
 
         # the directory of the database
         self.directory_name = "~/ECS165/"
+
+        # initialize buffer pool
+        self.bp = Bufferpool()
 
     def open(self, directory_name):
         """
@@ -52,6 +55,7 @@ class Database:
         """
         table = Table(name, num_columns, key)
         self.tables[name] = table
+        self.bp.table = table
         return table
 
     def drop_table(self, name):

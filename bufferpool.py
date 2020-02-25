@@ -63,7 +63,7 @@ class Bufferpool:
         new_buf_obj = Buff_object()
         new_buf_obj.pin = True  # FIXME: should we pin here?
         new_buf_obj.object = Page()
-        new_buf_obj.object.data = file.read(PAGE_SIZE)  # FIXME: is this valid
+        new_buf_obj.object.data = bytearray(file.read(PAGE_SIZE))  # FIXME: is this valid
         new_buf_obj.page_num = page_num
         new_buf_obj.page_range = page_range
         new_buf_obj.num_access += 1
@@ -124,9 +124,6 @@ class Bufferpool:
 
     def read_object(self, page_range, page_num, offset):
         obj = self.__get_object(page_range, page_num)
-        print("read_obj:", obj)
-        # for i in range(100):
-        #     print(obj.object.data[i])
         obj.num_access += 1
         obj.pin = True
         val = obj.object.read(start_index=offset)
@@ -144,4 +141,3 @@ class Bufferpool:
         obj.dirty = True
         obj.object.overwrite(offset=offset, value=val)
         obj.pin = False
-        print("DONE WRITE")

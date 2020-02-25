@@ -51,10 +51,7 @@ class Table:
         self.indexes = make_indexes(self.num_columns, self.prim_key_col_num, table=self)
 
         # name of directory that table is in
-        self.directory_name = ""
-
-        # name of the table within the directory
-        self.name = ""
+        self.directory_name = "~/ECS165/"
 
     def get_rid_value(self):
         """
