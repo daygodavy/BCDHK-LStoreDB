@@ -2,6 +2,7 @@ from config import *
 from collections import defaultdict
 import os
 from page import *
+from collections import defaultdict
 
 
 # we dont know either if it's page or page range
@@ -29,6 +30,7 @@ class Bufferpool:
 
     # should we pass boolean for read/write to mark it dirty for write?
     def __get_object(self, page_range, page_num):
+
         # print(len(self.pool))
         # for i, obj in enumerate(self.pool):
         #     if obj.page_range == page_range and obj.page_num == page_num:
@@ -50,6 +52,7 @@ class Bufferpool:
             obj.pin = True  # FIXME: should we pin here?
             print("ON DISK")
             return obj
+
 
         return self.__add_object(page_range, page_num)
 
@@ -154,4 +157,10 @@ class Bufferpool:
         obj.dirty = True
         obj.object.overwrite(offset=offset, value=val)
         obj.pin = False
+
         print("DONE WRITE")
+
+
+
+bp = Bufferpool()
+

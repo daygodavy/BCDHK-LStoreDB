@@ -1,4 +1,5 @@
 from page import Page
+from bufferpool import bp
 
 
 class Column:
@@ -99,12 +100,16 @@ class Column:
         """
         self.pages[page_number].overwrite(offset, 0)
 
-    def read(self, page_number, offset):
+    def read(self, page_number, offset, page_range):
         """
         read a value
 
+        :param page_range: int
         :param page_number: int
         :param offset: int
         :return: int
         """
-        return self.pages[page_number].read(offset)
+        read = bp.read_object(page_range=page_range, page_num=page_number, offset=offset)
+        print("READ:", read)
+        # return self.pages[page_number].read(offset)
+        return read
