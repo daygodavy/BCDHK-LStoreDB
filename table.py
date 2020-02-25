@@ -54,6 +54,10 @@ class Table:
         # name of directory that table is in
         self.directory_name = "~/ECS165/"
 
+        # stack of deleted, available RIDs
+        self.rid_stack = []
+
+
     def get_rid_value(self):
         """
         Manage the RIDs of the table
@@ -81,27 +85,33 @@ class Table:
         # TODO: Check to see if primary key already exists in table
         #   TA said this error check isn't necessary
 
-        # add meta column values to columns
-        RID = self.get_rid_value()
-        columns = [0, RID, int(time() * 1000000), 0, 0] + columns
+        # check if can grab old, deleted rid from rid_stack
+        if len(self.rid_stack) > 0:
+            RID, page_range, page_num, offset = self.rid_stack.pop(0)
+            columns = [0, RID, int(time() * 1000000), 0, 0] + columns
+            page_range.update_base_record(page_num, offset, columns)
+        else:
+            # get new rid and add meta-data columns
+            RID = self.get_rid_value()
+            columns = [0, RID, int(time() * 1000000), 0, 0] + columns
 
-        # get a hold of the last page range
-        page_range = self.ranges[-1]
+            # get a hold of the last page range
+            page_range = self.ranges[-1]
 
-        # if it is full
-        if not page_range:
-            # create a new one and append it
-            page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num)
-            self.ranges.append(page_range)
+            # if it is full
+            if not page_range.has_capacity:
+                # create a new one and append it
+                page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num)
+                self.ranges.append(page_range)
 
-        # write record to page range and return page number and offset of record
-        page_num, offset = page_range.add_base_record(columns)
+            # write record to page range and return page number and offset of record
+            page_num, offset = page_range.add_base_record(columns)
 
         # increment the number of records
         self.num_records += 1
 
         # update page directory
-        self.page_directory.update({RID: [len(self.ranges) - 1, page_num, offset]})
+        self.page_directory.update({RID: [page_range, page_num, offset]})
 
         # update primary key index
         self.indexes[self.prim_key_col_num].add_index_item(columns[self.prim_key_col_num], RID)
@@ -265,6 +275,9 @@ class Table:
 
         # get the location of the record
         page_range_num, page_num, offset = self.page_directory.get(RID[0])
+
+        # appending deleted RID to rid stack
+        self.rid_stack.append([RID, page_range_num, page_num, offset])
 
         # lazy delete the record
         self.ranges[page_range_num].delete_record(page_num, offset)

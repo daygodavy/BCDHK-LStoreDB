@@ -60,6 +60,19 @@ class PageRange:
         self.num_of_records += 1
         return page_number, offset
 
+    def update_base_record(self, page_number, offset, columns):
+        """
+        Update an existing base record in the page range
+
+        :param page_number: int             # the page number of the record to be read
+        :param offset: int                  # the offset of the record in the page to be read
+        :param columns: []                  # a list of the values defining the record
+        """
+        for i, col in enumerate(self.columns):
+            col.update_value(page_number, offset, value=columns[i])
+
+        self.num_of_records += 1
+
     def read_record(self, locations, query_columns):
         """
         Read a record from the page range
@@ -185,3 +198,4 @@ class PageRange:
         if self.update_count >= UPDATE_THRESHOLD and self.num_of_records % RECORDS_PER_PAGE == 0 and not self.merge:
             return True
         return False
+
