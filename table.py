@@ -86,9 +86,9 @@ class Table:
 
         # check if can grab old, deleted rid from rid_stack
         if len(self.rid_stack) > 0:
-            RID, page_range, page_num, offset = self.rid_stack.pop(0)
+            RID, page_range_index, page_num, offset = self.rid_stack.pop(0)
             columns = [0, RID, int(time() * 1000000), 0, 0] + columns
-            page_range.update_base_record(page_num, offset, columns)
+            self.table.ranges[page_range_index].update_base_record(page_num, offset, columns)
         else:
             # get new rid and add meta-data columns
             RID = self.get_rid_value()
@@ -96,6 +96,7 @@ class Table:
 
             # get a hold of the last page range
             page_range = self.ranges[-1]
+            page_range_index = len(self.ranges)-1
 
             # if it is full
             if not page_range.has_capacity:
@@ -110,7 +111,7 @@ class Table:
         self.num_records += 1
 
         # update page directory
-        self.page_directory.update({RID: [page_range, page_num, offset]})
+        self.page_directory.update({RID: [page_range_index, page_num, offset]})
 
         # update primary key index
         self.indexes[self.prim_key_col_num].add_index_item(columns[self.prim_key_col_num], RID)
@@ -147,6 +148,7 @@ class Table:
             page_range_num, page_num, offset = self.page_directory.get(RID)
 
             # TODO - double check that logic is correct
+
             # check to see if the record has been updated
             LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
             tps = self.ranges[page_num].tps
@@ -247,11 +249,11 @@ class Table:
 
             # if no matching RIDs break from this iteration of the loop
             if not rids:
+                miss += 1
                 continue
 
             # otherwise for every matching RID
             for RID in rids:
-
                 # get the location of the record and check to see if there has been an update
                 page_range_num, page_num, offset = self.page_directory.get(RID)
                 LID = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
@@ -261,6 +263,7 @@ class Table:
                     page_range_num, page_num, offset = self.page_directory.get(LID)
 
                 # do the actual summing
+
                 sum += self.ranges[page_range_num].read_column(page_range_num, page_num, offset, column_number)
 
         return sum
@@ -275,17 +278,17 @@ class Table:
         RID = self.indexes[self.prim_key_col_num].locate(key)
 
         # get the location of the record
-        page_range_num, page_num, offset = self.page_directory.get(RID[0])
+        if RID:
+            page_range_num, page_num, offset = self.page_directory.get(RID[0])
 
-        # appending deleted RID to rid stack
-        self.rid_stack.append([RID, page_range_num, page_num, offset])
+            # appending deleted RID to rid stack
+            self.rid_stack.append([RID[0], page_range_num, page_num, offset])
 
-        # lazy delete the record
-        self.ranges[page_range_num].delete_record(page_num, offset)
+            # lazy delete the record
+            self.ranges[page_range_num].delete_record(page_num, offset)
 
-        # TODO: why do we need to know how many valid records there are versus total records (valid+invalid) - terri and katya
-        # modify the number of records in the table
-        self.num_records -= 1
+            # modify the number of records in the table
+            self.num_records -= 1
 
     def save_table(self, directory_name):
         """

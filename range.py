@@ -148,7 +148,6 @@ class PageRange:
         for column in self.columns:
             column.delete(page_num, offset)
 
-        # TODO: shouldn't decrement record count - terri and katya
         self.num_of_records -= 1
 
     def update_schema_indirection(self, encoding, indirection_value, page_num, offset):
