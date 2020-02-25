@@ -50,6 +50,12 @@ class Table:
         # a list of indexes for the table
         self.indexes = make_indexes(self.num_columns, self.prim_key_col_num, table=self)
 
+        # name of directory that table is in
+        self.directory_name = ""
+
+        # name of the table within the directory
+        self.name = ""
+
     def get_rid_value(self):
         """
         Manage the RIDs of the table

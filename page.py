@@ -52,4 +52,7 @@ class Page:
         :param offset: int              # the offset in the page where the overwrite occurs
         :param value:  int              # the value being written to the offset
         """
+        print("VALUE:", value)
+        print("ENCODING:", encode(value))
         self.data[offset: offset + 8] = encode(value)
+        print("FINISHED OVERWRITE")

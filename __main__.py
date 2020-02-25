@@ -2,6 +2,7 @@ from db import Database
 from query import Query
 from time import process_time
 from random import choice, randrange
+from bufferpool import Bufferpool, Buff_object
 
 # Student Id and 4 grades
 db = Database()
@@ -47,12 +48,27 @@ for i in range(0, 10000, 100):
 agg_time_1 = process_time()
 print("Aggregate 10k of 100 record batch took:\t", agg_time_1 - agg_time_0)
 
-# Measuring Delete Performance
-delete_time_0 = process_time()
-for i in range(0, 10000):
-    query.delete(906659671 + i)
-delete_time_1 = process_time()
-print("Deleting 10k records took:  \t\t\t", delete_time_1 - delete_time_0)
+# # Measuring Delete Performance
+# delete_time_0 = process_time()
+# for i in range(0, 10000):
+#     query.delete(906659671 + i)
+# delete_time_1 = process_time()
+# print("Deleting 10k records took:  \t\t\t", delete_time_1 - delete_time_0)
 
+bp = Bufferpool()
+grades_table.directory_name = "~/ECS165/"
+grades_table.name = "Grades/"
+bp.table = grades_table
 db.close()
+
 db.open("~/ECS165")
+read = bp.read_object(0, 1, 1)
+print("READ1", read)
+bp.write_object(0, 1, 1, 919293949)
+read = bp.read_object(0, 1, 1)
+print("READ2", read)
+print("DONE")
+# read = bp.read_object(0, 1, 1)
+# print(read)
+
+
