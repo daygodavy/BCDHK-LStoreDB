@@ -7,6 +7,7 @@ from time import time
 from BTrees.OOBTree import OOBTree
 from config import *
 from index import Index
+from bufferpool import *
 
 
 class Table:
@@ -38,7 +39,7 @@ class Table:
         # a list containing the page ranges for the table
         self.ranges = [PageRange(self.number_of_columns, key)]
 
-        # the number of records in the tale
+        # the number of records in the table
         self.num_records = 0
 
         # highest used rid number
@@ -52,6 +53,9 @@ class Table:
 
         # name of directory that table is in
         self.directory_name = "~/ECS165/"
+
+        # initializing buffer pool
+        self.bp = Bufferpool()
 
     def get_rid_value(self):
         """
@@ -94,7 +98,7 @@ class Table:
             self.ranges.append(page_range)
 
         # write record to page range and return page number and offset of record
-        page_num, offset = page_range.add_base_record(columns)
+        page_num, offset = page_range.add_base_record(columns, page_range, self.bp)
 
         # increment the number of records
         self.num_records += 1
@@ -267,6 +271,12 @@ class Table:
 
          :param directory_name: string       # name of db directory
          """
+
+        # check if table directory exists, if not then create it
+        path = os.path.expanduser(directory_name) + self.name
+        if not os.path.isdir(path):
+            os.mkdir(path)
+
         # write table data to file
         sys.setrecursionlimit(RECURSION_LIMIT)
         with open(os.path.expanduser(directory_name + self.name + '/table'), 'wb+') as output:
@@ -285,17 +295,15 @@ class Table:
             for column in pg_range.columns:
                 for page_i, page in enumerate(column.pages):
 
-                    # add space between base pages and tail pages
-                    # if (page_i + 1) == column.last_base_page:
-                        # f.write(encode('\n'))
-
                     f.write(page.data)
-                    # add two spaces between pages
-                    # f.write(encode('\n'))
-                # f.write(encode('\n'))
 
             # close file for single page range
             f.close()
+
+        # save the metadata for storing relevant information for this table
+        # metadata = 'table-metadata'
+        # f = open(os.path.expanduser(directory_name + '/' + self.name + '/' + metadata), 'wb+')
+        # f.write()
 
     def __merge(self):
         pass
