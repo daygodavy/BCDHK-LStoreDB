@@ -221,7 +221,7 @@ class Table:
 
         # check if we've reached update threshold
         if self.ranges[page_range_num].check_threshold():
-            self.merge(self.ranges[page_range_num])
+            self.__merge(self.ranges[page_range_num])
 
     def sum_records(self, start_range, end_range, column_number):
         """
