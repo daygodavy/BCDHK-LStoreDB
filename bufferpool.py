@@ -2,7 +2,6 @@ from config import *
 from collections import defaultdict
 import os
 from page import *
-from collections import defaultdict
 
 
 # we dont know either if it's page or page range
@@ -11,7 +10,7 @@ class Buff_object:
         self.num_access = 0
         self.dirty = False
         self.pin = False
-        # page.. page range
+        # page
         self.object = None
         self.page_range = 0
         self.page_num = 0
@@ -23,76 +22,68 @@ class Bufferpool:
         self.pool = defaultdict(int)
         self.num_of_objects = 0
         self.table = None
+        self.latest_obj_key = None
 
     '''
-    Check if object is in bufferpool for retrieval
+    Creating new obj
     '''
 
     # should we pass boolean for read/write to mark it dirty for write?
+    def __create_new_obj(self, page_range, page_num=""):
+        obj = Buff_object()
+        obj.pin = True  # FIXME: should we pin here?
+        obj.object = Page()
+        page_range.num_pages += 1
+        #new_buf_obj.object.data = bytearray(file.read(PAGE_SIZE))  # FIXME: is this valid
+        obj.page_num = page_range.num_pages - 1
+        obj.page_range = page_range
+
+        self.pool[(page_range.id, obj.page_num)] = obj
+        self.latest_obj_key = (page_range.id, obj.page_num)
+        self.num_of_objects += 1
+
+        return obj
+
+        #return self.__add_object(page_range)
+
+    '''
+    Get object from disk
+    page_range: a PageRange obj
+    '''
+
     def __get_object(self, page_range, page_num):
-
-        # print(len(self.pool))
-        # for i, obj in enumerate(self.pool):
-        #     if obj.page_range == page_range and obj.page_num == page_num:
-        #         # obj found in bufferpool
-        #         # increment obj num_access
-        #         obj.num_access += 1
-        #         # pin the obj
-        #         obj.pin = True  # FIXME: should we pin here?
-        #         print("ON DISK")
-        #         return obj
-        # # obj not found in bufferpool so grab from disk
-        # print("NOT ON DISK")
-        obj = self.pool[(page_range, page_num)]
-        if obj != 0:
-            #obj found in bufferpool
-            # increment obj num_access
-            obj.num_access += 1
-            # pin the obj
-            obj.pin = True  # FIXME: should we pin here?
-            print("ON DISK")
-            return obj
-
-
-        return self.__add_object(page_range, page_num)
-
-    '''
-    Adding an object to the bufferpool
-    '''
-
-    def __add_object(self, page_range, page_num):
         # check if bufferpool is full, if so evict
         if self.num_of_objects > BUFFERPOOL_MAX_OBJECTS:
-            self.__replace_object(self, page_range, page_num)
-            # Need to evict 1 onject out, i.e writing it back to the memory
+            print("============BUFFERPOOL FULL=============")
+            print(self.num_of_objects)
+            print(BUFFERPOOL_MAX_OBJECTS)
+            self.__replace_object()
+            # Need to evict 1 object out, i.e writing it back to the memory
 
+        #if obj is on the disk
         # retrieve target obj from disk
-        target = "pagerange" + str(page_range)
-        print(self.table.directory_name + self.table.name + target)
+        target = "/pagerange" + str(page_range.id)
         file = open(os.path.expanduser(self.table.directory_name + self.table.name + target), 'rb+')
         file.seek(page_num * PAGE_SIZE, 0)
 
-        # add obj from disk to buffer pool
-        new_buf_obj = Buff_object()
-        new_buf_obj.pin = True  # FIXME: should we pin here?
-        new_buf_obj.object = Page()
-        new_buf_obj.object.data = bytearray(file.read(PAGE_SIZE))  # FIXME: is this valid
-        new_buf_obj.page_num = page_num
-        new_buf_obj.page_range = page_range
-        new_buf_obj.num_access += 1
-
-        self.pool[(page_range, page_num)] = new_buf_obj
+        obj = Buff_object()
+        obj.pin = True  # FIXME: should we pin here?
+        obj.object = Page()
+        obj.page_range = page_range
+        obj.page_num = page_num
+        self.pool[(page_range.id, page_num)] = obj
         self.num_of_objects += 1
-        return new_buf_obj
+
+        return obj
 
     '''
     Evict a bufferpool object from the bufferpool by its index
     #TODO:
     '''
 
-    def __evict_object(self, ind):
+    def __evict_object(self, key):
         try:
-            del self.pool[ind]
+            self.pool[key] = -1
             self.num_of_objects -= 1
         except:
             print("Index out of range")
@@ -103,27 +94,25 @@ class Bufferpool:
 
     def __replace_object(self):
         # 1)Find all unpinned objects in buffer pool
-        # unpinned_objs = []
-        # for key, obj in self.pool:
-        #     if obj.pin is False:
-        #         unpinned_objs.append(obj)
-
         # 2)Check number of accesses to determine evicted object (LRU)
         min_access = 999999999999
         min_obj = None
         key = -1
-        for i, obj in self.pool:
+
+        for key in self.pool:
+            obj = self.pool[key]
+            print("Inside bufferpool", obj)
             if obj.pin is False and min_access > obj.num_access:
                 min_access = obj.num_access
                 min_obj = obj
-                key = i
+                key = key
                 if min_access == 1:
                     break
 
         # 3)If dirty, flush to disk
         if min_obj.dirty is True:
             # TODO: Flush to disk
-            target = "pagerange" + str(min_obj.page_range)
+            target = "/pagerange" + str(min_obj.page_range.id)
             file = open(os.path.expanduser(self.table.name + target), 'wb+')
             file.seek(min_obj.page_num * PAGE_SIZE, 0)
             file.write(min_obj.object.data)  # FIXME: is this valid or must loop?
@@ -136,8 +125,12 @@ class Bufferpool:
     '''
 
     def read_object(self, page_range, page_num, offset):
-        obj = self.__get_object(page_range, page_num)
-        print("read_obj:", obj)
+        obj = self.pool[(page_range.id, page_num)]
+        if obj == -1: #not in bufferpool but in disk
+            print("NOT IN BUFFERPOOL")
+            obj = self.__get_object(page_range, page_num)
+
+        #print("read_obj:", obj)
         # for i in range(100):
         #     print(obj.object.data[i])
         obj.num_access += 1
@@ -150,17 +143,23 @@ class Bufferpool:
     Write to obj in bufferpool
     '''
 
-    def write_object(self, page_range, page_num, offset, val):
-        obj = self.__get_object(page_range, page_num)
+    def write_object(self, page_range, val):
+        #getting the page for the new record
+        obj = None
+        if len(self.pool) == 0:
+            obj = self.__create_new_obj(page_range)
+        else:
+            obj = self.pool[self.latest_obj_key]
+            if obj.object.has_capacity() is False:
+                obj = self.__create_new_obj(page_range)
+
         obj.num_access += 1
         obj.pin = True
         obj.dirty = True
-        obj.object.overwrite(offset=offset, value=val)
+        offset = obj.object.write(value=val)
+        #obj.object.write(offset=obj.latest_offset, value=val)
         obj.pin = False
-
-        print("DONE WRITE")
-
-
+        #print("DONE WRITE")
+        return obj.page_num, offset
 
 bp = Bufferpool()
-

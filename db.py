@@ -5,7 +5,7 @@ import shutil
 
 from config import *
 from table import Table
-from bufferpool import *
+from bufferpool import bp
 
 class Database:
 
@@ -59,7 +59,7 @@ class Database:
         """
         table = Table(name, num_columns, key)
         self.tables[name] = table
-        # self.bp.table = table
+        bp.table = table
         return table
 
     def drop_table(self, name):

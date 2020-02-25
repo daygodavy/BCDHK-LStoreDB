@@ -7,11 +7,8 @@ from time import time
 from BTrees.OOBTree import OOBTree
 from config import *
 from index import Index
-from bufferpool import *
-
 
 class Table:
-
     def __init__(self, name, num_columns, key):
         """
         The actual table holding the records
@@ -39,7 +36,7 @@ class Table:
         # a list containing the page ranges for the table
         self.ranges = [PageRange(self.number_of_columns, key)]
 
-        # the number of records in the table
+        # the number of records in the tale
         self.num_records = 0
 
         # highest used rid number
@@ -53,9 +50,6 @@ class Table:
 
         # name of directory that table is in
         self.directory_name = "~/ECS165/"
-
-        # initializing buffer pool
-        self.bp = Bufferpool()
 
     def get_rid_value(self):
         """
@@ -92,7 +86,7 @@ class Table:
         page_range = self.ranges[-1]
 
         # if it is full
-        if not page_range.has_capacity:
+        if not page_range:
             # create a new one and append it
             page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num)
             self.ranges.append(page_range)
@@ -104,7 +98,7 @@ class Table:
         self.num_records += 1
 
         # update page directory
-        self.page_directory.update({RID: [len(self.ranges) - 1, page_num, offset]})
+        self.page_directory.update({RID: [len(self.ranges)- 1, page_num, offset]})
 
         # update primary key index
         self.indexes[self.prim_key_col_num].add_index_item(columns[self.prim_key_col_num], RID)
@@ -138,10 +132,10 @@ class Table:
         for RID in rids:
 
             # get the location in the table
-            page_range_num, page_num, offset = self.page_directory.get(RID)
+            page_range, page_num, offset = self.page_directory.get(RID)
 
             # check to see if the record has been updated
-            LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+            LID = self.ranges[page_range].read_column(page_num, offset, INDIRECTION_COLUMN)
 
             # if it has been updated
             if LID != 0:
@@ -149,7 +143,7 @@ class Table:
                 _, page_num, offset = self.page_directory.get(LID)
 
             # get the record
-            record = self.ranges[page_range_num].read_record([[page_num, offset]], query_columns)
+            record = self.ranges[page_range].read_record([[page_num, offset]], query_columns)
 
             # append the record to records
             records = records + record
@@ -271,12 +265,6 @@ class Table:
 
          :param directory_name: string       # name of db directory
          """
-
-        # check if table directory exists, if not then create it
-        path = os.path.expanduser(directory_name) + self.name
-        if not os.path.isdir(path):
-            os.mkdir(path)
-
         # write table data to file
         sys.setrecursionlimit(RECURSION_LIMIT)
         with open(os.path.expanduser(directory_name + self.name + '/table'), 'wb+') as output:
@@ -295,15 +283,17 @@ class Table:
             for column in pg_range.columns:
                 for page_i, page in enumerate(column.pages):
 
+                    # add space between base pages and tail pages
+                    # if (page_i + 1) == column.last_base_page:
+                        # f.write(encode('\n'))
+
                     f.write(page.data)
+                    # add two spaces between pages
+                    # f.write(encode('\n'))
+                # f.write(encode('\n'))
 
             # close file for single page range
             f.close()
-
-        # save the metadata for storing relevant information for this table
-        # metadata = 'table-metadata'
-        # f = open(os.path.expanduser(directory_name + '/' + self.name + '/' + metadata), 'wb+')
-        # f.write()
 
     def __merge(self):
         pass
