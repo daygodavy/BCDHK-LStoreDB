@@ -96,7 +96,7 @@ class Table:
 
             # get a hold of the last page range
             page_range = self.ranges[-1]
-            page_range_index = len(self.ranges)-1
+            page_range_index = len(self.ranges) - 1
 
             # if it is full
             if not page_range.has_capacity:
@@ -329,7 +329,9 @@ class Table:
             for i in range(RECORDS_PER_PAGE):
                 iterate_offset -= 8
                 # return user data and rid column
-                record = original_page_range.read_record([tail_num, iterate_offset], [1] * self.number_of_columns)
+                record = original_page_range.read_record([tail_num, iterate_offset],
+                                                         ([0] * (NUMBER_OF_META_COLUMNS - 1)) + (
+                                                                     [1] * self.num_columns))
                 base_rid = record.columns[BASE_RID]
                 if not (base_rid in has_seen):
                     has_seen.append(base_rid)
