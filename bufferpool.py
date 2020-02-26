@@ -70,6 +70,9 @@ class Bufferpool:
 
     def __evict(self):
         eviction_item = self.pool[-1]
+        target = self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number)
+        file = open(os.path.expanduser(target), 'wb+')
+        file.write(eviction_item.page)
         del self.keys[(eviction_item.page_range_number, eviction_item.page_number)]
         del self.pool[-1]
 

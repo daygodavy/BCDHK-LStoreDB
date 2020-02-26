@@ -139,6 +139,7 @@ class Table:
 
             # if it has been updated
             if LID != 0:
+                print("LID: ", LID)
                 # get the updated records location
                 _, page_num, offset = self.page_directory.get(LID)
 
@@ -178,8 +179,10 @@ class Table:
 
         # update the base record with the new indirection value and schema encoding
         self.ranges[page_range_num].update_schema_indirection(new_schema_encoding, LID, page_num, offset)
+
+        # if there was originally an indirection value in the base record
         if indirection_value:
-            # find it
+            # find the tail record associated with it
             _, page_num, offset = self.page_directory.get(indirection_value, [0, page_num, offset])
 
         # get the base or tail record

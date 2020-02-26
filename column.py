@@ -79,7 +79,7 @@ class Column:
             self.pages.append(page)
             self.last_page += 1
 
-        return self.pages[self.last_page].page_number, offset
+        return self.last_page, offset
 
     def update_value(self, page_number, offset, value):
         """
