@@ -27,12 +27,10 @@ for key in records:
     record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
     error = False
     for i, column in enumerate(record.columns):
-        print("Our result", column)
-        print("Actual result", records[key][i])
         if column != records[key][i]:
             error = True
     if error:
-        print('select error on', key , ':', record, ', correct:', records[key])
+        print('select error on', key , ':', record.columns, ', correct:', records[key])
     else:
         print('select on', key, ':', record.columns)
 

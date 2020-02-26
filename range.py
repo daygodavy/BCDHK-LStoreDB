@@ -4,9 +4,8 @@ from record import Record
 
 
 class PageRange:
-    id = -1
 
-    def __init__(self, num_of_columns, primary_key_column):
+    def __init__(self, num_of_columns, primary_key_column, page_range_number):
         """
         The definition of a page range object. A page range holds a subset of the table.
         A page range will maintain all columns of a table but only a subset of all the records.
@@ -20,20 +19,21 @@ class PageRange:
         # the column of the primary key
         self.primary_key_column = primary_key_column
 
+        self.num_pages = -1
+
         # the columns of the page range
-        self.columns = make_columns(number_of_columns=self.num_of_columns)
+        self.columns = self.make_columns(self.num_of_columns)
 
         # the number of records in the page range
         self.num_of_records = 0
 
-        self.id = PageRange.id + 1
+        self.my_index = page_range_number
 
-        self.num_pages = 0
-
-    def add_base_record(self, columns, page_range):
+    def add_base_record(self, columns):
         """
         Add a record to the page range
 
+        :param page_range:
         :param columns: []                  # a list of the values defining the record
 
         :return: int                        # the page number of the added record
@@ -42,7 +42,7 @@ class PageRange:
         page_number = 0
         offset = 0
         for i, column in enumerate(self.columns):
-            page_number, offset = column.add_base_value(value=columns[i], page_range=page_range)
+            page_number, offset = column.add_base_value(self, columns[i])
         self.num_of_records += 1
         return page_number, offset
 
@@ -69,7 +69,7 @@ class PageRange:
 
                 # append the record value for this column to values
                 if query_columns[i]:
-                    values.append(self.read_column(page_number=location[0], offset=location[1], column_number=i))
+                    values.append(self.read_column(location[0], location[1], location[2], column_number=i))
 
             # store the record in records
             records.append(Record(rid=values[RID_COLUMN], key=values[self.primary_key_column], columns=values))
@@ -80,17 +80,18 @@ class PageRange:
         # return all the collected records from this page range
         return records
 
-    def read_column(self, page_number, offset, column_number):
+    def read_column(self, page_range_number, page_number, offset, column_number):
         """
         read a single column in the page range
 
+        :param page_range_number:
         :param page_number: int             # the page number of the record to be read
         :param offset: int                  # the offset of the record in the page to be read
         :param column_number: int           # the column number to read
 
         :return: int                        # the record value
         """
-        return self.columns[column_number].read(page_number=page_number, offset=offset, page_range=self)
+        return self.columns[column_number].read(page_range_number, page_number, offset)
 
     def add_tail_record(self, columns):
         """
@@ -105,7 +106,7 @@ class PageRange:
         page_number = 0
         offset = 0
         for i, column in enumerate(self.columns):
-            page_number, offset = column.add_tail_value(value=columns[i])
+            page_number, offset = column.add_tail_value(columns[i], self)
         return page_number, offset
 
     def delete_record(self, page_num, offset):
@@ -143,16 +144,20 @@ class PageRange:
         else:
             return False
 
+    def make_columns(self, number_of_columns):
+        """
+        Make the starting empty columns for the page range
 
-def make_columns(number_of_columns):
-    """
-    Make the starting empty columns for the page range
+        :param page_range_number:
+        :param number_of_columns: int           # the number of columns in the table
 
-    :param number_of_columns: int           # the number of columns in the table
+        :return: []                             # a list of columns
+        """
+        columns = []
+        for i in range(number_of_columns):
+            columns.append(Column(column_number=i, page_range=self, page_number=self.get_page_number()))
+        return columns
 
-    :return: []                             # a list of columns
-    """
-    columns = []
-    for i in range(number_of_columns):
-        columns.append(Column())
-    return columns
+    def get_page_number(self):
+        self.num_pages += 1
+        return self.num_pages

@@ -1,165 +1,120 @@
-from config import *
-from collections import defaultdict
 import os
-from page import *
+from config import *
 
 
 # we dont know either if it's page or page range
-class Buff_object:
-    def __init__(self):
-        self.num_access = 0
+class Bufferpool_Page:
+    def __init__(self, page_range_number, page_number):
         self.dirty = False
         self.pin = False
-        # page
-        self.object = None
-        self.page_range = 0
-        self.page_num = 0
+        self.page = None
+        self.page_range_number = page_range_number
+        self.page_number = page_number
 
 
 class Bufferpool:
     def __init__(self):
         # an array of all bufferpool objects
-        self.pool = defaultdict(int)
-        self.num_of_objects = 0
+        self.pool = []
+        self.keys = {}
+        self.max_num_objects = 16
         self.table = None
         self.latest_obj_key = None
 
-    '''
-    Creating new obj
-    '''
+    def __get_object(self, page_range_number, page_number):
+        """
+        Get the page to be written too
 
-    # should we pass boolean for read/write to mark it dirty for write?
-    def __create_new_obj(self, page_range, page_num=""):
-        obj = Buff_object()
-        obj.pin = True  # FIXME: should we pin here?
-        obj.object = Page()
-        page_range.num_pages += 1
-        #new_buf_obj.object.data = bytearray(file.read(PAGE_SIZE))  # FIXME: is this valid
-        obj.page_num = page_range.num_pages - 1
-        obj.page_range = page_range
+        :param page_range_number: int               # the number of the page range the page is in
+        :param page_number: int                     # the number of the page in the page range
 
-        self.pool[(page_range.id, obj.page_num)] = obj
-        self.latest_obj_key = (page_range.id, obj.page_num)
-        self.num_of_objects += 1
-
-        return obj
-
-        #return self.__add_object(page_range)
-
-    '''
-    Get object from disk
-    page_range: a PageRange obj
-    '''
-
-    def __get_object(self, page_range, page_num):
-        # check if bufferpool is full, if so evict
-        if self.num_of_objects > BUFFERPOOL_MAX_OBJECTS:
-            print("============BUFFERPOOL FULL=============")
-            print(self.num_of_objects)
-            print(BUFFERPOOL_MAX_OBJECTS)
-            self.__replace_object()
-            # Need to evict 1 object out, i.e writing it back to the memory
-
-        #if obj is on the disk
-        # retrieve target obj from disk
-        target = "/pagerange" + str(page_range.id)
-        file = open(os.path.expanduser(self.table.directory_name + self.table.name + target), 'rb+')
-        file.seek(page_num * PAGE_SIZE, 0)
-
-        obj = Buff_object()
-        obj.pin = True  # FIXME: should we pin here?
-        obj.object = Page()
-        obj.page_range = page_range
-        obj.page_num = page_num
-        self.pool[(page_range.id, page_num)] = obj
-        self.num_of_objects += 1
-
-        return obj
-
-    '''
-    Evict a bufferpool object from the bufferpool by its index
-    #TODO:
-    '''
-
-    def __evict_object(self, key):
-        try:
-            self.pool[key] = -1
-            self.num_of_objects -= 1
-        except:
-            print("Index out of range")
-
-    '''
-    Replacement policy for bufferpool via LRU
-    '''
-
-    def __replace_object(self):
-        # 1)Find all unpinned objects in buffer pool
-        # 2)Check number of accesses to determine evicted object (LRU)
-        min_access = 999999999999
-        min_obj = None
-        key = -1
-
-        for key in self.pool:
-            obj = self.pool[key]
-            print("Inside bufferpool", obj)
-            if obj.pin is False and min_access > obj.num_access:
-                min_access = obj.num_access
-                min_obj = obj
-                key = key
-                if min_access == 1:
+        :return: Bufferpool_Page                        # a bufferpool object containing the relevant page
+        """
+        # if the page is in the bufferpool
+        buf_page = Bufferpool_Page(page_range_number, page_number)
+        if (page_range_number, page_number) in self.keys:
+            # find the index and the object
+            for index, buf_object in enumerate(self.pool):
+                if buf_object.page_range_number == page_range_number and buf_object.page_number == page_number:
                     break
 
-        # 3)If dirty, flush to disk
-        if min_obj.dirty is True:
-            # TODO: Flush to disk
-            target = "/pagerange" + str(min_obj.page_range.id)
-            file = open(os.path.expanduser(self.table.name + target), 'wb+')
-            file.seek(min_obj.page_num * PAGE_SIZE, 0)
-            file.write(min_obj.object.data)  # FIXME: is this valid or must loop?
+            # shuffle the list accordingly
+            self.pool[:] = self.pool[:index] + self.pool[index + 1:]
 
-        # 4)Evict from the buffer pool
-        self.__evict_object(key)
+            # put the object at the front of the list
+            self.pool.insert(0, buf_object)
+            return buf_object
 
-    '''
-    Read obj from bufferpool
-    '''
+        # otherwise add a new item to the pool
+        # if the pool is full evict the last item
+        if len(self.pool) >= self.max_num_objects:
+            self.__evict()
 
-    def read_object(self, page_range, page_num, offset):
-        obj = self.pool[(page_range.id, page_num)]
-        if obj == -1: #not in bufferpool but in disk
-            print("NOT IN BUFFERPOOL")
-            obj = self.__get_object(page_range, page_num)
+        # either way add the new buf_object to the pool
+        self.pool.insert(0, buf_page)
+        self.keys[(page_range_number, page_number)] = True
 
-        #print("read_obj:", obj)
-        # for i in range(100):
-        #     print(obj.object.data[i])
-        obj.num_access += 1
-        obj.pin = True
-        val = obj.object.read(start_index=offset)
-        obj.pin = False
-        return val
+        # get page from disk
+        target = "/pagerange" + str(page_range_number)
+        file = open(os.path.expanduser(self.table.directory_name + self.table.name + target), 'rb+')
 
-    '''
-    Write to obj in bufferpool
-    '''
+        # find the offset of the start of the page in the file
+        file.seek(page_number * PAGE_SIZE, 0)
 
-    def write_object(self, page_range, val):
-        #getting the page for the new record
-        obj = None
-        if len(self.pool) == 0:
-            obj = self.__create_new_obj(page_range)
-        else:
-            obj = self.pool[self.latest_obj_key]
-            if obj.object.has_capacity() is False:
-                obj = self.__create_new_obj(page_range)
+        # assign the buf_page's page the correct data from disk
+        buf_page.pin = True
+        buf_page.page = bytearray(file.read(PAGE_SIZE))
+        buf_page.pin = False
 
-        obj.num_access += 1
-        obj.pin = True
-        obj.dirty = True
-        offset = obj.object.write(value=val)
-        #obj.object.write(offset=obj.latest_offset, value=val)
-        obj.pin = False
-        #print("DONE WRITE")
-        return obj.page_num, offset
+        return buf_page
+
+    def __evict(self):
+        eviction_item = self.pool[-1]
+        del self.keys[(eviction_item.page_range_number, eviction_item.page_number)]
+        del self.pool[-1]
+
+    def read(self, page_range_number, page_number, offset):
+        """
+        Read from a page
+
+        :param page_range_number: int               # the page range to read from
+        :param page_number: int                     # the page number witin the range to read from
+        :param offset: int                          # the offset within the page to read from
+
+        :return: int                                # the value to be read
+        """
+        # get the page to be read from
+        buf_page = self.__get_object(page_range_number, page_number)
+
+        # get the value we want to read
+        buf_page.pin = True
+        value = decode(buf_page.page[ offset: offset + 8 ])
+        buf_page.pin = False
+
+        return value
+
+    def write(self, page_range, page_number, offset, value):
+        """
+        Write an object to a page
+
+        :param page_range:
+        :param page_number:
+        :param offset:
+        :param value:
+        :return:
+        """
+        # get the page to be written too
+        buf_page = self.__get_object(page_range.my_index, page_number)
+
+        # update meta values and write value to page
+        buf_page.pin = True
+        buf_page.dirty = True
+        buf_page.page[ offset: offset + 8 ] = encode(value)
+        buf_page.pin = False
+        return buf_page.page_number
+
+    def overwrite(self, page_range_number, page_number, offset, val):
+        pass
+
 
 bp = Bufferpool()

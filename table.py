@@ -34,7 +34,7 @@ class Table:
         self.page_directory = OOBTree()
 
         # a list containing the page ranges for the table
-        self.ranges = [PageRange(self.number_of_columns, key)]
+        self.ranges = [PageRange(self.number_of_columns, key, 0)]
 
         # the number of records in the tale
         self.num_records = 0
@@ -92,13 +92,13 @@ class Table:
             self.ranges.append(page_range)
 
         # write record to page range and return page number and offset of record
-        page_num, offset = page_range.add_base_record(columns, page_range)
+        page_num, offset = page_range.add_base_record(columns)
 
         # increment the number of records
         self.num_records += 1
 
         # update page directory
-        self.page_directory.update({RID: [len(self.ranges)- 1, page_num, offset]})
+        self.page_directory.update({RID: [len(self.ranges) - 1, page_num, offset]})
 
         # update primary key index
         self.indexes[self.prim_key_col_num].add_index_item(columns[self.prim_key_col_num], RID)
@@ -135,7 +135,7 @@ class Table:
             page_range, page_num, offset = self.page_directory.get(RID)
 
             # check to see if the record has been updated
-            LID = self.ranges[page_range].read_column(page_num, offset, INDIRECTION_COLUMN)
+            LID = self.ranges[page_range].read_column(page_range, page_num, offset, INDIRECTION_COLUMN)
 
             # if it has been updated
             if LID != 0:
@@ -143,7 +143,7 @@ class Table:
                 _, page_num, offset = self.page_directory.get(LID)
 
             # get the record
-            record = self.ranges[page_range].read_record([[page_num, offset]], query_columns)
+            record = self.ranges[page_range].read_record([[page_range, page_num, offset]], query_columns)
 
             # append the record to records
             records = records + record
@@ -168,13 +168,13 @@ class Table:
         page_range_num, page_num, offset = self.page_directory.get(RID[0])
 
         # get current schema encoding
-        schema_encoding = self.ranges[page_range_num].read_column(page_num, offset, SCHEMA_ENCODING_COLUMN)
+        schema_encoding = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, SCHEMA_ENCODING_COLUMN)
 
         # get the new schema encoding by ORing the new one with the existing one
         new_schema_encoding = schema_encoding | get_schema_encoding(columns)
 
         # if there is already a tail record get it's LID
-        indirection_value = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+        indirection_value = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
 
         # update the base record with the new indirection value and schema encoding
         self.ranges[page_range_num].update_schema_indirection(new_schema_encoding, LID, page_num, offset)
@@ -184,7 +184,7 @@ class Table:
 
         # get the base or tail record
         # TODO: improve efficiency by only getting record values we need
-        record = self.ranges[page_range_num].read_record([[page_num, offset]], [1] * self.number_of_columns)[0]
+        record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[0]
 
         columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding] + list(columns)
 

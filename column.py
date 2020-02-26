@@ -1,11 +1,14 @@
 from page import Page
-from bufferpool import bp
+
 
 class Column:
 
-    def __init__(self):
-        # the pages of the column
-        #self.pages = [Page()]
+    def __init__(self, column_number, page_range, page_number):
+        # a list of pages
+        self.pages = [Page(page_range, page_number)]
+
+        # the number of this column
+        self.column_number = column_number
 
         # the index of the last base page in the column
         self.last_base_page = 0
@@ -13,7 +16,7 @@ class Column:
         # the index of the last page of the column
         self.last_page = 0
 
-    def add_base_value(self, value, page_range):
+    def add_base_value(self, page_range, value):
         """
         Add a record to a the base pages
 
@@ -22,32 +25,29 @@ class Column:
         :return: int                        # the page number of the page being written too
         :return: int                        # the offset of the write operation
         """
-        # page = self.pages[self.last_base_page]
-        # offset = 0
-        #
-        # # if page has capacity
-        # if page.has_capacity():
-        #
-        #     # write to it
-        #     offset = page.write(value)
-        #
-        # # otherwise create a new one and add it
-        # else:
-        #     page = Page()
-        #     offset = page.write(value)
-        #     self.last_base_page += 1
-        #     self.pages.insert(self.last_base_page, page)
-        #     self.last_page += 1
-        page_num, offset = bp.write_object(page_range, value)
+        page = self.pages[self.last_base_page]
+        offset = 0
 
-        return page_num, offset
+        # if page has capacity
+        if page.has_capacity():
 
-    def add_tail_value(self, value):
+            # write to it
+            offset = page.write(value)
+
+        # otherwise create a new one and add it
+        else:
+            page = Page(page_range, page_range.get_page_number())
+            offset = page.write(value)
+            self.last_base_page += 1
+            self.pages.insert(self.last_base_page, page)
+            self.last_page += 1
+
+        return self.last_base_page, offset
+
+    def add_tail_value(self, value, page_range):
         """
         Add a record to the tail pages
-
         :param value: int                   # the value to be added to the base pages
-
         :return: int                        # the page number of the page being written too
         :return: int                        # the offset of the write operation
         """
@@ -58,7 +58,7 @@ class Column:
         if self.last_page == self.last_base_page:
 
             # create a tail page
-            page = Page()
+            page = Page(page_range, page_range.get_page_number())
             self.pages.append(page)
             self.last_page += 1
 
@@ -74,12 +74,12 @@ class Column:
 
         # otherwise add a new tail page
         else:
-            page = Page()
+            page = Page(page_range, page_range.get_page_number())
             offset = page.write(value)
             self.pages.append(page)
             self.last_page += 1
 
-        return self.last_page, offset
+        return self.pages[self.last_page].page_number, offset
 
     def update_value(self, page_number, offset, value):
         """
@@ -100,16 +100,13 @@ class Column:
         """
         self.pages[page_number].overwrite(offset, 0)
 
-    def read(self, page_number, offset, page_range):
+    def read(self, page_range, page_number, offset):
         """
         read a value
 
-        :param page_range: page_range obj
+        :param page_range_number:
         :param page_number: int
         :param offset: int
         :return: int
         """
-        read = bp.read_object(page_range=page_range, page_num=page_number, offset=offset)
-        #print("READ:", read)
-        # return self.pages[page_number].read(offset)
-        return read
+        return self.pages[page_number].read(page_range, self.pages[page_number].page_number, offset)
