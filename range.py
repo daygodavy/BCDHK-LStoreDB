@@ -41,6 +41,9 @@ class PageRange:
         self.merge = False
 
         # num of last tail page in prev update range
+        self.last_tail_page = 0
+
+        # tps tracks the RID of the last tail record that was applied in a merge
         self.tps = 0
 
     def add_base_record(self, columns):

@@ -152,11 +152,17 @@ class Table:
             # check to see if the record has been updated
             LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
             tps = self.ranges[page_range_num].tps
+            # print("LID: {} TPS: {}".format(LID, tps))
 
             # if it has been updated
-            if LID > tps:
+            if LID != 0:
                 # get the updated records location
                 _, page_num, offset = self.page_directory.get(LID)
+
+            # # after a merge, LID for all merged records is equal to zero
+            # if 0 < LID < tps:
+            #     # get the updated records location
+            #     _, page_num, offset = self.page_directory.get(LID)
 
             # get the record
             record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], query_columns)
@@ -214,6 +220,10 @@ class Table:
         for i in range(NUMBER_OF_META_COLUMNS, len(columns)):
             if columns[i] is None:
                 columns[i] = record.columns[i]
+
+        # # debugging: print columns contents:
+        # for i in range(NUMBER_OF_META_COLUMNS, len(columns)):
+        #     print("in update record, column{}: {}".format(i, columns[i]))
 
         # add tail record
         page_num, offset = self.ranges[page_range_num].add_tail_record(columns)
@@ -319,7 +329,7 @@ class Table:
         has_seen = []
 
         # iterate through all tail pages except last, check for last update to record
-        for tail_num in range(original_page_range.tps + 1, -1, -2):
+        for tail_num in range(original_page_range.last_tail_page + 1, -1, -2):
             iterate_offset = PAGE_SIZE
             for i in range(int(RECORDS_PER_PAGE)):
                 iterate_offset -= 8
@@ -341,7 +351,6 @@ class Table:
                     # TODO - double check that correct
 
                     # edit base record's meta data columns accordingly
-                    copy_page_range.columns[INDIRECTION_COLUMN].update_value(page_num, offset, 0)
                     copy_page_range.columns[SCHEMA_ENCODING_COLUMN].update_value(page_num, offset, 0)
 
                 # if have seen all rids in base pages, break since found all latest updates
@@ -349,7 +358,9 @@ class Table:
                     break
 
         # update tps of copy of page range
-        copy_page_range.tps = copy_page_range.columns[0].last_page - 1
+        copy_page_range.last_tail_page = copy_page_range.columns[0].last_page - 1
+
+        copy_page_range.tps = copy_page_range.read_column(copy_page_range.columns[0].last_page-1, PAGE_SIZE-8, RID_COLUMN)
 
         # update range and get new index to update page directory
         self.ranges.append(copy_page_range)
