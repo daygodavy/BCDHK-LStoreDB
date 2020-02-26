@@ -249,7 +249,6 @@ class Table:
 
             # if no matching RIDs break from this iteration of the loop
             if not rids:
-                miss += 1
                 continue
 
             # otherwise for every matching RID
@@ -304,6 +303,7 @@ class Table:
         bp.close()
 
     def __merge(self, original_page_range):
+        print("inside table.__merge()")
 
         # beginning merge on this page range
         original_page_range.merge = True
@@ -326,21 +326,24 @@ class Table:
         # iterate through all tail pages except last, check for last update to record
         iterate_offset = PAGE_SIZE
         for tail_num in range(original_page_range.tps + 1, -1, -2):
-            for i in range(RECORDS_PER_PAGE):
+            for i in range(int(RECORDS_PER_PAGE)):
                 iterate_offset -= 8
                 # return user data and rid column
-                record = original_page_range.read_record([tail_num, iterate_offset],
-                                                         ([0] * (NUMBER_OF_META_COLUMNS - 1)) + (
-                                                                     [1] * self.num_columns))
-                base_rid = record.columns[BASE_RID]
+                query_cols = [0,1,0,0] + ([1] * (self.num_columns + 1))
+                record = original_page_range.read_record([[tail_num, iterate_offset]], query_cols)[0]
+                base_rid = record.columns[0]
+                print("base rid: ", base_rid)
                 if not (base_rid in has_seen):
                     has_seen.append(base_rid)
 
                     _, page_num, offset = self.page_directory[base_rid]
 
                     # ignore meta data columns and copy just the user data over
-                    for n, column in enumerate(copy_page_range.columns, start=NUMBER_OF_META_COLUMNS):
-                        column.update_value((page_num, offset, record.columns[n]))
+                    for n, column in enumerate(copy_page_range.columns):
+                        if n > 4:
+                            column.update_value(page_num, offset, record.columns[n-4])
+                            # print("record.cols: ", record.columns[n-4])
+
 
                     # TODO - double check that correct
 
@@ -351,6 +354,7 @@ class Table:
                 # if have seen all rids in base pages, break since found all latest updates
                 if len(has_seen) == self.rid:
                     break
+        print("merge done")
 
         # append tail pages to copy of page range
         for i, col in enumerate(original_page_range.columns):

@@ -15,7 +15,7 @@ records = {}
 
 seed(3562901)
 
-for i in range(0, 1000):
+for i in range(0, 1024):
     key = 92106429 + randint(0, 9000)
     while key in records:
         key = 92106429 + randint(0, 9000)
