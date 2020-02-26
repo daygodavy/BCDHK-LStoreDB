@@ -3,9 +3,9 @@ import glob
 import pickle
 import shutil
 
-from config import *
 from table import Table
 from bufferpool import bp
+
 
 class Database:
 

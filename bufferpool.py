@@ -54,9 +54,16 @@ class Bufferpool:
         self.pool.insert(0, buf_page)
         self.keys[(page_range_number, page_number)] = True
 
-        # get page from disk
-        target = "/pagerange" + str(page_range_number)
-        file = open(os.path.expanduser(self.table.directory_name + self.table.name + target), 'rb+')
+        # create path for pageRange file
+        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(page_range_number))
+
+        # if file doesn't exist, make it
+        if not os.path.isfile(target):
+            file = open(target, 'w+')
+            file.close()
+
+        # get data from file
+        file = open(os.path.expanduser(target), 'rb+')
 
         # find the offset of the start of the page in the file
         file.seek(page_number * PAGE_SIZE, 0)
@@ -70,11 +77,13 @@ class Bufferpool:
 
     def __evict(self):
         eviction_item = self.pool[-1]
-        target = self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number)
-        file = open(os.path.expanduser(target), 'wb+')
-        file.write(eviction_item.page)
+        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number))
+        file = open(target, 'wb+')
+        temp = eviction_item.page
+        file.write(bytearray(temp))
         del self.keys[(eviction_item.page_range_number, eviction_item.page_number)]
         del self.pool[-1]
+        file.close()
 
     def read(self, page_range_number, page_number, offset):
         """
