@@ -139,7 +139,7 @@ class Table:
 
             # if it has been updated
             if LID != 0:
-                print("LID: ", LID)
+
                 # get the updated records location
                 _, page_num, offset = self.page_directory.get(LID)
 
@@ -233,14 +233,14 @@ class Table:
 
                 # get the location of the record and check to see if there has been an update
                 page_range_num, page_num, offset = self.page_directory.get(RID)
-                LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+                LID = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
 
                 # if an update get the location of the latest update
                 if LID:
                     page_range_num, page_num, offset = self.page_directory.get(LID)
 
                 # do the actual summing
-                sum += self.ranges[page_range_num].read_column(page_num, offset, column_number)
+                sum += self.ranges[page_range_num].read_column(page_range_num, page_num, offset, column_number)
 
         return sum
 

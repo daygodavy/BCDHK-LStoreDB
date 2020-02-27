@@ -56,11 +56,11 @@ class Bufferpool:
 
         # create path for pageRange file
         target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(page_range_number))
-
-        # if file doesn't exist, make it
-        if not os.path.isfile(target):
-            file = open(target, 'w+')
-            file.close()
+        #
+        # # if file doesn't exist, make it
+        # if not os.path.isfile(target):
+        #     file = open(target, 'w+')
+        #     file.close()
 
         # get data from file
         file = open(os.path.expanduser(target), 'rb+')
@@ -79,8 +79,9 @@ class Bufferpool:
         eviction_item = self.pool[-1]
         target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number))
         file = open(target, 'wb+')
+        file.seek(eviction_item.page_number * PAGE_SIZE, 0)
         temp = eviction_item.page
-        file.write(bytearray(temp))
+        file.write(bytes(temp))
         del self.keys[(eviction_item.page_range_number, eviction_item.page_number)]
         del self.pool[-1]
         file.close()
