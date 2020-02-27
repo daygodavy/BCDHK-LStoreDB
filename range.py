@@ -40,6 +40,9 @@ class PageRange:
         # want one merge to occur at once
         self.merge = False
 
+        # merge count
+        self.num_merges = 0
+
         # num of last tail page in prev update range
         self.last_tail_page = 0
 

@@ -89,7 +89,7 @@ class Table:
         if len(self.rid_stack) > 0:
             RID, page_range_index, page_num, offset = self.rid_stack.pop(0)
             columns = [0, RID, int(time() * 1000000), 0, 0] + columns
-            self.table.ranges[page_range_index].update_base_record(page_num, offset, columns)
+            self.ranges[page_range_index].update_base_record(page_num, offset, columns)
         else:
             # get new rid and add meta-data columns
             RID = self.get_rid_value()
@@ -153,16 +153,16 @@ class Table:
             # check to see if the record has been updated
             LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
             tps = self.ranges[page_range_num].tps
-            # print("LID: {} TPS: {}".format(LID, tps))
 
-            # if it has been updated
-            if LID != 0:
+            # if a merge hasn't occurred, check for an update
+            if self.ranges[page_range_num].num_merges == 0 and LID != 0:
                 # get the updated records location
                 _, page_num, offset = self.page_directory.get(LID)
 
-            # if 0 < LID < tps:
-            #     # get the updated records location
-            #     _, page_num, offset = self.page_directory.get(LID)
+            # if a merge has occurred, check TPS and LID values
+            elif self.ranges[page_range_num].num_merges > 0 and 0 < LID < tps:
+                # get the updated records location
+                _, page_num, offset = self.page_directory.get(LID)
 
             # get the record
             record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], query_columns)
@@ -221,23 +221,16 @@ class Table:
             if columns[i] is None:
                 columns[i] = record.columns[i]
 
-        # # debugging: print columns contents:
-        # for i in range(NUMBER_OF_META_COLUMNS, len(columns)):
-        #     print("in update record, column{}: {}".format(i, columns[i]))
-
         # add tail record
         page_num, offset = self.ranges[page_range_num].add_tail_record(columns)
 
         # update page directory
         self.page_directory.update({LID: [page_range_num, page_num, offset]})
 
-        # check if we've reached update threshold
+        # if we've reached update threshold, start merge
         if self.ranges[page_range_num].check_threshold():
             merge_thread = Thread(target=self.__merge, args=(self.ranges[page_range_num],))
-            print("MERGE THREAD STARTING")
             merge_thread.start()
-
-
 
     def sum_records(self, start_range, end_range, column_number):
         """
@@ -317,14 +310,9 @@ class Table:
         bp.close()
 
     def __merge(self, original_page_range):
-        print("inside table.__merge()")
 
         # beginning merge on this page range
         original_page_range.merge = True
-
-        # num of base, tail pages of original to create copy
-        num_of_base_pages = original_page_range.columns[0].last_base_page + 1
-        num_of_tail_pages = original_page_range.columns[0].last_page - original_page_range.columns[0].last_base_page
 
         # create a copy of the page range
         copy_page_range = original_page_range
@@ -346,11 +334,11 @@ class Table:
 
                     _, page_num, offset = self.page_directory[base_rid]
 
+                    # TODO: clean this logic up?
                     # ignore meta data columns and copy just the user data over
                     for n, column in enumerate(copy_page_range.columns):
                         if n > 4:
                             column.update_value(page_num, offset, record.columns[n - 4])
-                            # print("record.cols: ", record.columns[n-4])
 
                     # TODO - double check that correct
 
@@ -361,10 +349,12 @@ class Table:
                 if len(has_seen) == self.rid:
                     break
 
-        # update tps of copy of page range
+        # update last tail page
         copy_page_range.last_tail_page = copy_page_range.columns[0].last_page - 1
 
-        copy_page_range.tps = copy_page_range.read_column(copy_page_range.columns[0].last_page-1, PAGE_SIZE-8, RID_COLUMN)
+        # update tps of copy of page range
+        copy_page_range.tps = copy_page_range.read_column(copy_page_range.columns[0].last_page - 1, PAGE_SIZE - 8,
+                                                          RID_COLUMN)
 
         # update range and get new index to update page directory
         self.ranges.append(copy_page_range)
@@ -381,7 +371,9 @@ class Table:
 
         # reset update counter to trigger merge
         self.ranges[range_index].update_count = 0
-        print("__MERGE DONE")
+
+        # update merge count
+        self.ranges[range_index].num_merges += 1
 
 
 def get_schema_encoding(columns):
