@@ -34,7 +34,6 @@ class Database:
             table_file = name + '/table'
             table = pickle.load(open(table_file, "rb"))
             self.tables[table.name] = table
-        print("In db print table", table.ranges)
         print("database opened")
 
     def close(self):
@@ -59,6 +58,9 @@ class Database:
             os.mkdir(target)
 
         table = Table(name, num_columns, key)
+        if name in self.tables.keys():
+            table = self.tables[name]
+
         self.tables[name] = table
         bp.table = table
         return table
