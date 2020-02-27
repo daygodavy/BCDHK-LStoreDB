@@ -9,6 +9,7 @@ from config import *
 from index import Index
 
 class Table:
+
     def __init__(self, name, num_columns, key):
         """
         The actual table holding the records
@@ -34,7 +35,7 @@ class Table:
         self.page_directory = OOBTree()
 
         # a list containing the page ranges for the table
-        self.ranges = [PageRange(self.number_of_columns, key, 0)]
+        self.ranges = [PageRange(self.number_of_columns, key, 0, os.path.expanduser("~/ECS165/" + self.name))]
 
         # the number of records in the tale
         self.num_records = 0

@@ -31,7 +31,6 @@ class Bufferpool:
         :return: Bufferpool_Page                        # a bufferpool object containing the relevant page
         """
         # if the page is in the bufferpool
-        buf_page = Bufferpool_Page(page_range_number, page_number)
         if (page_range_number, page_number) in self.keys:
             # find the index and the object
             for index, buf_object in enumerate(self.pool):
@@ -51,39 +50,33 @@ class Bufferpool:
             self.__evict()
 
         # either way add the new buf_object to the pool
-        self.pool.insert(0, buf_page)
+        buf_object = Bufferpool_Page(page_range_number, page_number)
+        self.pool.insert(0, buf_object)
         self.keys[(page_range_number, page_number)] = True
 
         # create path for pageRange file
-        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(page_range_number))
+        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(page_range_number) + "/" + str(buf_object.page_number))
 
         # if file doesn't exist, make it
+        buf_object.pin = True
         if not os.path.isfile(target):
-            file = open(target, 'w+')
+             buf_object.page = bytearray(4096)
+        else:
+            file = open(os.path.expanduser(target), 'rb+')
+            buf_object.page = bytearray(file.read())
             file.close()
 
-        # get data from file
-        file = open(os.path.expanduser(target), 'rb+')
+        buf_object.pin = False
 
-        # find the offset of the start of the page in the file
-        file.seek(page_number * PAGE_SIZE, 0)
-
-        # assign the buf_page's page the correct data from disk
-        buf_page.pin = True
-        buf_page.page = bytearray(file.read(PAGE_SIZE))
-        file.close()
-        buf_page.pin = False
-
-        return buf_page
+        return buf_object
 
     def __evict(self):
         # get a handle on the item to evict
         eviction_item = self.pool[-1]
 
         # open the file and write the contents to disk
-        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number))
+        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number) + "/" + str(eviction_item.page_number))
         file = open(target, 'wb+')
-        file.seek(eviction_item.page_number * PAGE_SIZE, 0)
         file.write(eviction_item.page)
         file.close()
 

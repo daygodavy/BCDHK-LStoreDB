@@ -16,9 +16,6 @@ class Database:
         # the directory of the database
         self.directory_name = "~/ECS165/"
 
-        # # initialize buffer pool
-        # self.bp = Bufferpool()
-
     def open(self, directory_name):
         """
         Start the database from the given directory
@@ -57,6 +54,11 @@ class Database:
 
         :return: table object       # the table object being created
         """
+        target = os.path.expanduser(self.directory_name + name)
+        print("target: ", target)
+        if not os.path.isdir(target):
+            os.mkdir(target)
+
         table = Table(name, num_columns, key)
         self.tables[name] = table
         bp.table = table

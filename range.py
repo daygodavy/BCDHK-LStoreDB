@@ -1,11 +1,12 @@
 from config import *
 from column import Column
 from record import Record
+import os
 
 
 class PageRange:
 
-    def __init__(self, num_of_columns, primary_key_column, page_range_number):
+    def __init__(self, num_of_columns, primary_key_column, page_range_number, directory_name):
         """
         The definition of a page range object. A page range holds a subset of the table.
         A page range will maintain all columns of a table but only a subset of all the records.
@@ -28,6 +29,11 @@ class PageRange:
         self.num_of_records = 0
 
         self.my_index = page_range_number
+
+        target = directory_name + '/pageRange' + str(self.my_index)
+        print(target)
+        if not os.path.isdir(target):
+            os.mkdir(target)
 
     def add_base_record(self, columns):
         """
