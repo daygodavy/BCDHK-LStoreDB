@@ -8,6 +8,7 @@ from BTrees.OOBTree import OOBTree
 from config import *
 from index import Index
 from bufferpool import bp
+from threading import Thread
 
 
 class Table:
@@ -159,7 +160,6 @@ class Table:
                 # get the updated records location
                 _, page_num, offset = self.page_directory.get(LID)
 
-            # # after a merge, LID for all merged records is equal to zero
             # if 0 < LID < tps:
             #     # get the updated records location
             #     _, page_num, offset = self.page_directory.get(LID)
@@ -233,7 +233,11 @@ class Table:
 
         # check if we've reached update threshold
         if self.ranges[page_range_num].check_threshold():
-            self.__merge(self.ranges[page_range_num])
+            merge_thread = Thread(target=self.__merge, args=(self.ranges[page_range_num],))
+            print("MERGE THREAD STARTING")
+            merge_thread.start()
+
+
 
     def sum_records(self, start_range, end_range, column_number):
         """
@@ -377,7 +381,7 @@ class Table:
 
         # reset update counter to trigger merge
         self.ranges[range_index].update_count = 0
-        print("merge done")
+        print("__MERGE DONE")
 
 
 def get_schema_encoding(columns):
