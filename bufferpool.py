@@ -56,11 +56,11 @@ class Bufferpool:
 
         # create path for pageRange file
         target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(page_range_number))
-        #
-        # # if file doesn't exist, make it
-        # if not os.path.isfile(target):
-        #     file = open(target, 'w+')
-        #     file.close()
+
+        # if file doesn't exist, make it
+        if not os.path.isfile(target):
+            file = open(target, 'w+')
+            file.close()
 
         # get data from file
         file = open(os.path.expanduser(target), 'rb+')
@@ -71,6 +71,7 @@ class Bufferpool:
         # assign the buf_page's page the correct data from disk
         buf_page.pin = True
         buf_page.page = bytearray(file.read(PAGE_SIZE))
+        file.close()
         buf_page.pin = False
 
         return buf_page
