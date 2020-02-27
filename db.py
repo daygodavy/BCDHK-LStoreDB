@@ -55,7 +55,6 @@ class Database:
         :return: table object       # the table object being created
         """
         target = os.path.expanduser(self.directory_name + name)
-        print("target: ", target)
         if not os.path.isdir(target):
             os.mkdir(target)
 

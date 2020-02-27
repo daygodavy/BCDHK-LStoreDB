@@ -31,7 +31,6 @@ class PageRange:
         self.my_index = page_range_number
 
         target = directory_name + '/pageRange' + str(self.my_index)
-        print(target)
         if not os.path.isdir(target):
             os.mkdir(target)
 

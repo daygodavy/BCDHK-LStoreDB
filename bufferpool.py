@@ -28,7 +28,7 @@ class Bufferpool:
         :param page_range_number: int               # the number of the page range the page is in
         :param page_number: int                     # the number of the page in the page range
 
-        :return: Bufferpool_Page                        # a bufferpool object containing the relevant page
+        :return: Bufferpool_Page                    # a bufferpool object containing the relevant page
         """
         # if the page is in the bufferpool
         if (page_range_number, page_number) in self.keys:
@@ -55,12 +55,14 @@ class Bufferpool:
         self.keys[(page_range_number, page_number)] = True
 
         # create path for pageRange file
-        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(page_range_number) + "/" + str(buf_object.page_number))
+        target = os.path.expanduser(
+            self.table.directory_name + self.table.name + "/pageRange" + str(page_range_number) + "/" + str(
+                buf_object.page_number))
 
         # if file doesn't exist, make it
         buf_object.pin = True
         if not os.path.isfile(target):
-             buf_object.page = bytearray(4096)
+            buf_object.page = bytearray(4096)
         else:
             file = open(os.path.expanduser(target), 'rb+')
             buf_object.page = bytearray(file.read())
@@ -75,7 +77,8 @@ class Bufferpool:
         eviction_item = self.pool[-1]
 
         # open the file and write the contents to disk
-        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number) + "/" + str(eviction_item.page_number))
+        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(
+            eviction_item.page_range_number) + "/" + str(eviction_item.page_number))
         file = open(target, 'wb+')
         file.write(eviction_item.page)
         file.close()
@@ -89,7 +92,7 @@ class Bufferpool:
         Read from a page
 
         :param page_range_number: int               # the page range to read from
-        :param page_number: int                     # the page number witin the range to read from
+        :param page_number: int                     # the page number the range to read from
         :param offset: int                          # the offset within the page to read from
 
         :return: int                                # the value to be read
@@ -99,7 +102,7 @@ class Bufferpool:
 
         # get the value we want to read
         buf_page.pin = True
-        value = decode(buf_page.page[ offset: offset + 8 ])
+        value = decode(buf_page.page[offset: offset + 8])
         buf_page.pin = False
 
         return value
@@ -120,9 +123,13 @@ class Bufferpool:
         # update meta values and write value to page
         buf_page.pin = True
         buf_page.dirty = True
-        buf_page.page[ offset: offset + 8 ] = encode(value)
+        buf_page.page[offset: offset + 8] = encode(value)
         buf_page.pin = False
         return buf_page.page_number
+
+    def close(self):
+        for i in range(len(self.pool)):
+            self.__evict()
 
 
 bp = Bufferpool()
