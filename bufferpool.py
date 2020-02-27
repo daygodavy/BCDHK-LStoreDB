@@ -6,6 +6,8 @@ from config import *
 class Bufferpool_Page:
     def __init__(self, page_range_number, page_number):
         self.dirty = False
+
+        # if True then do not evict
         self.pin = False
         self.page = None
         self.page_range_number = page_range_number
@@ -74,17 +76,19 @@ class Bufferpool:
 
     def __evict(self):
         # get a handle on the item to evict
-        eviction_item = self.pool[-1]
+        for eviction_item in reversed(self.pool):
+            print("Key: " + str(eviction_item.page_range_number) + ", " + str(eviction_item.page_number))
+            print(eviction_item.pin)
+            if not eviction_item.pin:
+                break
 
         # open the file and write the contents to disk
-        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(
-            eviction_item.page_range_number) + "/" + str(eviction_item.page_number))
+        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number) + "/" + str(eviction_item.page_number))
         file = open(target, 'wb+')
         file.write(eviction_item.page)
         file.close()
 
         # evict the item
-        #print(self.keys[(eviction_item.page_range_number, eviction_item.page_number)])
         del self.keys[(eviction_item.page_range_number, eviction_item.page_number)]
 
         self.pool.pop()

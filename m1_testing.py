@@ -21,7 +21,7 @@ for i in range(0, 1024):
         key = 92106429 + randint(0, 9000)
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
     query.insert(*records[key])
-    #print('inserted', records[key])
+    print('inserted', records[key])
 
 for key in records:
     record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
@@ -31,8 +31,8 @@ for key in records:
             error = True
     if error:
         print('select error on', key, ':', record.columns, ', correct:', records[key])
-    #else:
-        #print('select on', key, ':', record.columns)
+    else:
+        print('select on', key, ':', record.columns)
 
 for key in records:
     updated_columns = [None, None, None, None, None]
@@ -49,8 +49,8 @@ for key in records:
                 error = True
         if error:
             print('update error on', original, 'and', updated_columns, ':', record.columns, ', correct:', records[key])
-        #else:
-            #print('update on', original, 'and', updated_columns, ':', record.columns)
+        else:
+            print('update on', original, 'and', updated_columns, ':', record.columns)
         updated_columns[i] = None
 
 keys = sorted(list(records.keys()))
