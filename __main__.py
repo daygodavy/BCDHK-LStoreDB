@@ -2,6 +2,7 @@ from db import Database
 from query import Query
 from time import process_time
 from random import choice, randrange
+from bufferpool import Bufferpool
 
 # Student Id and 4 grades
 db = Database()
@@ -55,4 +56,6 @@ delete_time_1 = process_time()
 print("Deleting 10k records took:  \t\t\t", delete_time_1 - delete_time_0)
 
 db.close()
-db.open("~/ECS165")
+
+
+

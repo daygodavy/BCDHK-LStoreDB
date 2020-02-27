@@ -30,7 +30,7 @@ for key in records:
         if column != records[key][i]:
             error = True
     if error:
-        print('select error on', key , ':', record, ', correct:', records[key])
+        print('select error on', key, ':', record.columns, ', correct:', records[key])
     else:
         print('select on', key, ':', record.columns)
 
@@ -63,3 +63,6 @@ for c in range(0, grades_table.num_columns):
             print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
         else:
             print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
+
+db.close()
+db.open("~/ECS165")

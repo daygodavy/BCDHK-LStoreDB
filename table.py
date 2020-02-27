@@ -7,7 +7,7 @@ from time import time
 from BTrees.OOBTree import OOBTree
 from config import *
 from index import Index
-
+from bufferpool import bp
 
 class Table:
 
@@ -36,7 +36,7 @@ class Table:
         self.page_directory = OOBTree()
 
         # a list containing the page ranges for the table
-        self.ranges = [PageRange(self.number_of_columns, key)]
+        self.ranges = [PageRange(self.number_of_columns, key, 0, os.path.expanduser("~/ECS165/" + self.name))]
 
         # the number of records in the tale
         self.num_records = 0
@@ -49,6 +49,9 @@ class Table:
 
         # a list of indexes for the table
         self.indexes = make_indexes(self.num_columns, self.prim_key_col_num, table=self)
+
+        # name of directory that table is in
+        self.directory_name = "~/ECS165/"
 
     def get_rid_value(self):
         """
@@ -85,7 +88,7 @@ class Table:
         page_range = self.ranges[-1]
 
         # if it is full
-        if not page_range.has_capacity:
+        if not page_range:
             # create a new one and append it
             page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num)
             self.ranges.append(page_range)
@@ -131,18 +134,19 @@ class Table:
         for RID in rids:
 
             # get the location in the table
-            page_range_num, page_num, offset = self.page_directory.get(RID)
+            page_range, page_num, offset = self.page_directory.get(RID)
 
             # check to see if the record has been updated
-            LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+            LID = self.ranges[page_range].read_column(page_range, page_num, offset, INDIRECTION_COLUMN)
 
             # if it has been updated
             if LID != 0:
+
                 # get the updated records location
                 _, page_num, offset = self.page_directory.get(LID)
 
             # get the record
-            record = self.ranges[page_range_num].read_record([[page_num, offset]], query_columns)
+            record = self.ranges[page_range].read_record([[page_range, page_num, offset]], query_columns)
 
             # append the record to records
             records = records + record
@@ -167,23 +171,25 @@ class Table:
         page_range_num, page_num, offset = self.page_directory.get(RID[0])
 
         # get current schema encoding
-        schema_encoding = self.ranges[page_range_num].read_column(page_num, offset, SCHEMA_ENCODING_COLUMN)
+        schema_encoding = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, SCHEMA_ENCODING_COLUMN)
 
         # get the new schema encoding by ORing the new one with the existing one
         new_schema_encoding = schema_encoding | get_schema_encoding(columns)
 
         # if there is already a tail record get it's LID
-        indirection_value = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+        indirection_value = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
 
         # update the base record with the new indirection value and schema encoding
         self.ranges[page_range_num].update_schema_indirection(new_schema_encoding, LID, page_num, offset)
+
+        # if there was originally an indirection value in the base record
         if indirection_value:
-            # find it
+            # find the tail record associated with it
             _, page_num, offset = self.page_directory.get(indirection_value, [0, page_num, offset])
 
         # get the base or tail record
         # TODO: improve efficiency by only getting record values we need
-        record = self.ranges[page_range_num].read_record([[page_num, offset]], [1] * self.number_of_columns)[0]
+        record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[0]
 
         columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding] + list(columns)
 
@@ -229,14 +235,14 @@ class Table:
 
                 # get the location of the record and check to see if there has been an update
                 page_range_num, page_num, offset = self.page_directory.get(RID)
-                LID = self.ranges[page_range_num].read_column(page_num, offset, INDIRECTION_COLUMN)
+                LID = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
 
                 # if an update get the location of the latest update
                 if LID:
                     page_range_num, page_num, offset = self.page_directory.get(LID)
 
                 # do the actual summing
-                sum += self.ranges[page_range_num].read_column(page_num, offset, column_number)
+                sum += self.ranges[page_range_num].read_column(page_range_num, page_num, offset, column_number)
 
         return sum
 
@@ -269,30 +275,7 @@ class Table:
         with open(os.path.expanduser(directory_name + self.name + '/table'), 'wb+') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
-        # TODO - think if better way to separate info in file than with spaces
-
-        # write each page range to separate file in same dir
-        for range_i, pg_range in enumerate(self.ranges):
-
-            # open file to write in byte_arrays
-            name = "pageRange" + str(range_i)
-            f = open(os.path.expanduser(directory_name + '/' + self.name + '/' + name), 'wb+')
-
-            # iterate through single page range
-            for column in pg_range.columns:
-                for page_i, page in enumerate(column.pages):
-
-                    # add space between base pages and tail pages
-                    # if (page_i + 1) == column.last_base_page:
-                        # f.write(encode('\n'))
-
-                    f.write(page.data)
-                    # add two spaces between pages
-                    # f.write(encode('\n'))
-                # f.write(encode('\n'))
-
-            # close file for single page range
-            f.close()
+        bp.close()
 
     def __merge(self):
         pass

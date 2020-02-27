@@ -1,18 +1,19 @@
 from config import *
+from bufferpool import Bufferpool_Page, bp
 
 
 class Page:
 
-    def __init__(self):
+    def __init__(self, page_range, page_number):
         # number of records in the page
         self.num_records = 0
-        
-        # the actual data for the page object
-        self.data = bytearray(PAGE_SIZE)
 
-    """
-    A method which checks if the page has room for another record value
-    """
+        # the page range this page belongs too
+        self.page_range = page_range
+
+        # the number of the page in the file
+        self.page_number = page_number
+
     def has_capacity(self):
         """
         A method which checks if the page has room for another record value
@@ -25,20 +26,23 @@ class Page:
         """
         A method which writes a record value to the page
 
+        :param page_range:
         :param value: int              # the value record value to be written
         """
         start = self.num_records * 8
         self.num_records += 1
-        self.data[start: start + 8] = encode(value)
+        bp.write(self.page_range, self.page_number, start, value)
         return start
 
-    def read(self, start_index):
+    def read(self, page_range, page_number, start_index):
         """
         A method which reads from the page beginning at the "start index" offset
 
         :param start_index: int        # start index to start the read from
         """
-        return decode(self.data[start_index: start_index + 8])
+        return bp.read(page_range, page_number, start_index)
+
+        # return decode(self.data[start_index: start_index + 8])
         # TODO: TA said this error check wasn't necessary
         # if start_index < PAGE_SIZE:
         #     return decode(self.data[start_index: start_index + 8])
@@ -52,4 +56,4 @@ class Page:
         :param offset: int              # the offset in the page where the overwrite occurs
         :param value:  int              # the value being written to the offset
         """
-        self.data[offset: offset + 8] = encode(value)
+        bp.write(self.page_range, self.page_number, offset, value)

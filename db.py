@@ -3,8 +3,8 @@ import glob
 import pickle
 import shutil
 
-from config import *
 from table import Table
+from bufferpool import bp
 
 
 class Database:
@@ -22,7 +22,11 @@ class Database:
 
         :param directory_name: str      # a string representing the directory of the database
         """
+
+        # check if directory exists, if not then create it
         self.directory_name = os.path.expanduser(directory_name) + '/'
+        if not os.path.isdir(self.directory_name):
+            os.mkdir(self.directory_name)
 
         # for each table in the database folder
         for _, name in enumerate(glob.glob(self.directory_name + "/*", recursive=True)):
@@ -50,8 +54,13 @@ class Database:
 
         :return: table object       # the table object being created
         """
+        target = os.path.expanduser(self.directory_name + name)
+        if not os.path.isdir(target):
+            os.mkdir(target)
+
         table = Table(name, num_columns, key)
         self.tables[name] = table
+        bp.table = table
         return table
 
     def drop_table(self, name):
