@@ -84,8 +84,10 @@ class Bufferpool:
         file.close()
 
         # evict the item
+        #print(self.keys[(eviction_item.page_range_number, eviction_item.page_number)])
         del self.keys[(eviction_item.page_range_number, eviction_item.page_number)]
-        del self.pool[-1]
+
+        self.pool.pop()
 
     def read(self, page_range_number, page_number, offset):
         """

@@ -96,7 +96,7 @@ class PageRange:
 
         # for each location[page_number, offset]
         for location in locations:
-
+            #print("Location: ", location)
             # for each column in the page range
             for i, _ in enumerate(self.columns):
 

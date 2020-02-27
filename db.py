@@ -34,7 +34,7 @@ class Database:
             table_file = name + '/table'
             table = pickle.load(open(table_file, "rb"))
             self.tables[table.name] = table
-
+        print("In db print table", table.ranges)
         print("database opened")
 
     def close(self):

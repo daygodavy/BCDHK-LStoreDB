@@ -1,5 +1,7 @@
-from lstore.db import Database
-from lstore.query import Query
+#from lstore.db import Database
+from db import Database
+#from lstore.query import Query
+from query import Query
 
 from random import choice, randint, sample, seed
 

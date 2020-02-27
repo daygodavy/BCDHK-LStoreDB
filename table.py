@@ -327,7 +327,7 @@ class Table:
                 iterate_offset -= 8
                 # return user data and rid column
                 query_cols = [0, 1, 0, 0, 0] + ([1] * self.num_columns)
-                record = original_page_range.read_record([[tail_num, iterate_offset]], query_cols)[0]
+                record = original_page_range.read_record([[original_page_range.my_index, tail_num, iterate_offset]], query_cols)[0]
                 base_rid = record.columns[0]
                 if not (base_rid in has_seen):
                     has_seen.append(base_rid)
@@ -353,7 +353,7 @@ class Table:
         copy_page_range.last_tail_page = copy_page_range.columns[0].last_page - 1
 
         # update tps of copy of page range
-        copy_page_range.tps = copy_page_range.read_column(copy_page_range.columns[0].last_page - 1, PAGE_SIZE - 8,
+        copy_page_range.tps = copy_page_range.read_column(copy_page_range.my_index, copy_page_range.columns[0].last_page - 1, PAGE_SIZE - 8,
                                                           RID_COLUMN)
 
         # update range and get new index to update page directory
