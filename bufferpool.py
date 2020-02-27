@@ -76,15 +76,19 @@ class Bufferpool:
         return buf_page
 
     def __evict(self):
+        # get a handle on the item to evict
         eviction_item = self.pool[-1]
+
+        # open the file and write the contents to disk
         target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number))
         file = open(target, 'wb+')
         file.seek(eviction_item.page_number * PAGE_SIZE, 0)
-        temp = eviction_item.page
-        file.write(bytes(temp))
+        file.write(eviction_item.page)
+        file.close()
+
+        # evict the item
         del self.keys[(eviction_item.page_range_number, eviction_item.page_number)]
         del self.pool[-1]
-        file.close()
 
     def read(self, page_range_number, page_number, offset):
         """
@@ -125,9 +129,6 @@ class Bufferpool:
         buf_page.page[ offset: offset + 8 ] = encode(value)
         buf_page.pin = False
         return buf_page.page_number
-
-    def overwrite(self, page_range_number, page_number, offset, val):
-        pass
 
 
 bp = Bufferpool()
