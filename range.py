@@ -139,7 +139,7 @@ class PageRange:
         page_number = 0
         offset = 0
         for i, column in enumerate(self.columns):
-            page_number, offset = column.add_tail_value(value=columns[i])
+            page_number, offset = column.add_tail_value(value=columns[i], page_range = self)
         self.update_count += 1
 
         return page_number, offset
@@ -203,4 +203,3 @@ class PageRange:
         if self.update_count >= UPDATE_THRESHOLD and self.num_of_records % RECORDS_PER_PAGE == 0 and not self.merge:
             return True
         return False
-
