@@ -38,7 +38,7 @@ class Table:
         self.page_directory = OOBTree()
 
         # a list containing the page ranges for the table
-        self.ranges = [PageRange(self.number_of_columns, key, 0, os.path.expanduser("~/ECS165/" + self.name))]
+        self.ranges = [PageRange(self.number_of_columns, self.prim_key_col_num, 0, os.path.expanduser("~/ECS165/" + self.name))]
 
         # the number of records in the tale
         self.num_records = 0
@@ -97,16 +97,18 @@ class Table:
 
             # get a hold of the last page range
             page_range = self.ranges[-1]
-            page_range_index = len(self.ranges) - 1
+            #page_range_index = len(self.ranges) - 1
 
             # if it is full
-            if not page_range.has_capacity:
+            if not page_range.has_capacity():
                 # create a new one and append it
-                page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num)
+
+                page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num, page_range_number=page_range.my_index+1, directory_name=os.path.expanduser("~/ECS165/" + self.name))
                 self.ranges.append(page_range)
 
             # write record to page range and return page number and offset of record
             page_num, offset = page_range.add_base_record(columns)
+            page_range_index = len(self.ranges) - 1
 
         # increment the number of records
         self.num_records += 1
@@ -157,12 +159,12 @@ class Table:
             # if a merge hasn't occurred, check for an update
             if self.ranges[page_range_num].num_merges == 0 and LID != 0:
                 # get the updated records location
-                _, page_num, offset = self.page_directory.get(LID)
+                page_range_num, page_num, offset = self.page_directory.get(LID)
 
             # if a merge has occurred, check TPS and LID values
             elif self.ranges[page_range_num].num_merges > 0 and 0 < LID < tps:
                 # get the updated records location
-                _, page_num, offset = self.page_directory.get(LID)
+                page_range_num, page_num, offset = self.page_directory.get(LID)
 
             # get the record
             record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], query_columns)
@@ -211,8 +213,7 @@ class Table:
         # get the base or tail record
         # TODO: improve efficiency by only getting record values we need
         record = \
-            self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[
-                0]
+            self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[0]
 
         columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding, RID[0]] + list(columns)
 

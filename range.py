@@ -30,9 +30,6 @@ class PageRange:
 
         self.my_index = page_range_number
 
-        print("===================================================")
-        print("Page range number:", page_range_number)
-        print("===================================================")
         target = directory_name + '/pageRange' + str(self.my_index)
         if not os.path.isdir(target):
             print("New page range created")
@@ -66,7 +63,7 @@ class PageRange:
         page_number = 0
         offset = 0
         for i, column in enumerate(self.columns):
-            page_number, offset = column.add_base_value(self, columns[i])
+            page_number, offset = column.add_base_value(page_range=self, value=columns[i])
         self.num_of_records += 1
         return page_number, offset
 
@@ -97,22 +94,24 @@ class PageRange:
 
         # a list to hold the values of one record at a time
         values = []
+        returning_values = []
 
         # for each location[page_number, offset]
         for location in locations:
             #print("Location: ", location)
             # for each column in the page range
             for i, _ in enumerate(self.columns):
-
+                values.append(self.read_column(location[0], location[1], location[2], column_number=i))
                 # append the record value for this column to values
                 if query_columns[i]:
-                    values.append(self.read_column(location[0], location[1], location[2], column_number=i))
+                    returning_values.append(self.read_column(location[0], location[1], location[2], column_number=i))
 
             # store the record in records
-            records.append(Record(rid=values[RID_COLUMN], key=values[self.primary_key_column], columns=values))
+            records.append(Record(rid=values[RID_COLUMN], key=values[self.primary_key_column], columns=returning_values))
 
             # reset values
             values = []
+            returning_values = []
 
         # return all the collected records from this page range
         return records
