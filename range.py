@@ -30,8 +30,12 @@ class PageRange:
 
         self.my_index = page_range_number
 
+        print("===================================================")
+        print("Page range number:", page_range_number)
+        print("===================================================")
         target = directory_name + '/pageRange' + str(self.my_index)
         if not os.path.isdir(target):
+            print("New page range created")
             os.mkdir(target)
 
         # the number of updates to the page range
@@ -176,8 +180,8 @@ class PageRange:
         """
         if self.num_of_records < PAGE_RANGE_SIZE:
             return True
-        else:
-            return False
+
+        return False
 
     def get_page_number(self):
         self.num_pages += 1

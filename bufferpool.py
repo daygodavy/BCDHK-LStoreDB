@@ -1,5 +1,6 @@
 import os
 from config import *
+from threading import Lock
 
 
 # we dont know either if it's page or page range
@@ -22,6 +23,7 @@ class Bufferpool:
         self.max_num_objects = 16
         self.table = None
         self.latest_obj_key = None
+        self.lock = Lock()
 
     def __get_object(self, page_range_number, page_number):
         """
@@ -49,7 +51,9 @@ class Bufferpool:
         # otherwise add a new item to the pool
         # if the pool is full evict the last item
         if len(self.pool) >= self.max_num_objects:
+            self.lock.acquire()
             self.__evict()
+            self.lock.release()
 
         # either way add the new buf_object to the pool
         buf_object = Bufferpool_Page(page_range_number, page_number)
@@ -77,8 +81,8 @@ class Bufferpool:
     def __evict(self):
         # get a handle on the item to evict
         for eviction_item in reversed(self.pool):
-            print("Key: " + str(eviction_item.page_range_number) + ", " + str(eviction_item.page_number))
-            print(eviction_item.pin)
+           #print("Key: " + str(eviction_item.page_range_number) + ", " + str(eviction_item.page_number))
+            #print(eviction_item.pin)
             if not eviction_item.pin:
                 break
 
@@ -135,7 +139,9 @@ class Bufferpool:
 
     def close(self):
         for i in range(len(self.pool)):
+            self.lock.acquire()
             self.__evict()
+            self.lock.release()
 
 
 bp = Bufferpool()
