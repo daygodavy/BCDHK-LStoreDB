@@ -34,7 +34,6 @@ class Database:
             table_file = name + '/table'
             table = pickle.load(open(table_file, "rb"))
             self.tables[table.name] = table
-
         print("database opened")
 
     def close(self):
@@ -54,11 +53,18 @@ class Database:
 
         :return: table object       # the table object being created
         """
-        target = os.path.expanduser(self.directory_name + name)
+        subtarget = os.path.expanduser(self.directory_name)
+        if not os.path.isdir(subtarget):
+            os.mkdir(subtarget)
+
+        target = subtarget + name
         if not os.path.isdir(target):
             os.mkdir(target)
 
         table = Table(name, num_columns, key)
+        if name in self.tables.keys():
+            table = self.tables[name]
+
         self.tables[name] = table
         bp.table = table
         return table

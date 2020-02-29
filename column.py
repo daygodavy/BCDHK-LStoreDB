@@ -83,7 +83,7 @@ class Column:
 
     def update_value(self, page_number, offset, value):
         """
-        Update the base record value of a record
+        Update the value of a record
 
         :param page_number: int             # the page number by which we are updating a record
         :param offset: int                  # the offset in the page of the record to be updated

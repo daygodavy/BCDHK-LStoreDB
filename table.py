@@ -8,6 +8,8 @@ from BTrees.OOBTree import OOBTree
 from config import *
 from index import Index
 from bufferpool import bp
+from threading import Thread
+
 
 class Table:
 
@@ -36,7 +38,7 @@ class Table:
         self.page_directory = OOBTree()
 
         # a list containing the page ranges for the table
-        self.ranges = [PageRange(self.number_of_columns, key, 0, os.path.expanduser("~/ECS165/" + self.name))]
+        self.ranges = [PageRange(self.number_of_columns, self.prim_key_col_num, 0, os.path.expanduser("~/ECS165/" + self.name))]
 
         # the number of records in the tale
         self.num_records = 0
@@ -48,10 +50,13 @@ class Table:
         self.lid = LID_MAX
 
         # a list of indexes for the table
-        self.indexes = make_indexes(self.num_columns, self.prim_key_col_num, table=self)
+        self.indexes = make_indexes(self.number_of_columns, self.prim_key_col_num, table=self)
 
         # name of directory that table is in
         self.directory_name = "~/ECS165/"
+
+        # stack of deleted, available RIDs
+        self.rid_stack = []
 
     def get_rid_value(self):
         """
@@ -80,27 +85,36 @@ class Table:
         # TODO: Check to see if primary key already exists in table
         #   TA said this error check isn't necessary
 
-        # add meta column values to columns
-        RID = self.get_rid_value()
-        columns = [0, RID, int(time() * 1000000), 0] + columns
+        # check if can grab old, deleted rid from rid_stack
+        if len(self.rid_stack) > 0:
+            RID, page_range_index, page_num, offset = self.rid_stack.pop(0)
+            columns = [0, RID, int(time() * 1000000), 0, 0] + columns
+            self.ranges[page_range_index].update_base_record(page_num, offset, columns)
+        else:
+            # get new rid and add meta-data columns
+            RID = self.get_rid_value()
+            columns = [0, RID, int(time() * 1000000), 0, 0] + columns
 
-        # get a hold of the last page range
-        page_range = self.ranges[-1]
+            # get a hold of the last page range
+            page_range = self.ranges[-1]
+            #page_range_index = len(self.ranges) - 1
 
-        # if it is full
-        if not page_range:
-            # create a new one and append it
-            page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num)
-            self.ranges.append(page_range)
+            # if it is full
+            if not page_range.has_capacity():
+                # create a new one and append it
 
-        # write record to page range and return page number and offset of record
-        page_num, offset = page_range.add_base_record(columns)
+                page_range = PageRange(num_of_columns=self.number_of_columns, primary_key_column=self.prim_key_col_num, page_range_number=page_range.my_index+1, directory_name=os.path.expanduser("~/ECS165/" + self.name))
+                self.ranges.append(page_range)
+
+            # write record to page range and return page number and offset of record
+            page_num, offset = page_range.add_base_record(columns)
+            page_range_index = len(self.ranges) - 1
 
         # increment the number of records
         self.num_records += 1
 
         # update page directory
-        self.page_directory.update({RID: [len(self.ranges) - 1, page_num, offset]})
+        self.page_directory.update({RID: [page_range_index, page_num, offset]})
 
         # update primary key index
         self.indexes[self.prim_key_col_num].add_index_item(columns[self.prim_key_col_num], RID)
@@ -134,19 +148,26 @@ class Table:
         for RID in rids:
 
             # get the location in the table
-            page_range, page_num, offset = self.page_directory.get(RID)
+            page_range_num, page_num, offset = self.page_directory.get(RID)
+
+            # TODO - double check that logic is correct
 
             # check to see if the record has been updated
-            LID = self.ranges[page_range].read_column(page_range, page_num, offset, INDIRECTION_COLUMN)
+            LID = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
+            tps = self.ranges[page_range_num].tps
 
-            # if it has been updated
-            if LID != 0:
-
+            # if a merge hasn't occurred, check for an update
+            if self.ranges[page_range_num].num_merges == 0 and LID != 0:
                 # get the updated records location
-                _, page_num, offset = self.page_directory.get(LID)
+                page_range_num, page_num, offset = self.page_directory.get(LID)
+
+            # if a merge has occurred, check TPS and LID values
+            elif self.ranges[page_range_num].num_merges > 0 and 0 < LID < tps:
+                # get the updated records location
+                page_range_num, page_num, offset = self.page_directory.get(LID)
 
             # get the record
-            record = self.ranges[page_range].read_record([[page_range, page_num, offset]], query_columns)
+            record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], query_columns)
 
             # append the record to records
             records = records + record
@@ -171,27 +192,30 @@ class Table:
         page_range_num, page_num, offset = self.page_directory.get(RID[0])
 
         # get current schema encoding
-        schema_encoding = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, SCHEMA_ENCODING_COLUMN)
+        schema_encoding = self.ranges[page_range_num].read_column(page_range_num, page_num, offset,
+                                                                  SCHEMA_ENCODING_COLUMN)
 
         # get the new schema encoding by ORing the new one with the existing one
         new_schema_encoding = schema_encoding | get_schema_encoding(columns)
 
         # if there is already a tail record get it's LID
-        indirection_value = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
+        indirection_value = self.ranges[page_range_num].read_column(page_range_num, page_num, offset,
+                                                                    INDIRECTION_COLUMN)
 
         # update the base record with the new indirection value and schema encoding
         self.ranges[page_range_num].update_schema_indirection(new_schema_encoding, LID, page_num, offset)
 
         # if there was originally an indirection value in the base record
         if indirection_value:
-            # find the tail record associated with it
+            # find it
             _, page_num, offset = self.page_directory.get(indirection_value, [0, page_num, offset])
 
         # get the base or tail record
         # TODO: improve efficiency by only getting record values we need
-        record = self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[0]
+        record = \
+            self.ranges[page_range_num].read_record([[page_range_num, page_num, offset]], [1] * self.number_of_columns)[0]
 
-        columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding] + list(columns)
+        columns = [indirection_value, LID, int(time() * 1000000), new_schema_encoding, RID[0]] + list(columns)
 
         # for every column, if we have a new value save it, otherwise use old value
         for i in range(NUMBER_OF_META_COLUMNS, len(columns)):
@@ -203,6 +227,11 @@ class Table:
 
         # update page directory
         self.page_directory.update({LID: [page_range_num, page_num, offset]})
+
+        # if we've reached update threshold, start merge
+        if self.ranges[page_range_num].check_threshold():
+            merge_thread = Thread(target=self.__merge, args=(self.ranges[page_range_num],))
+            merge_thread.start()
 
     def sum_records(self, start_range, end_range, column_number):
         """
@@ -232,7 +261,6 @@ class Table:
 
             # otherwise for every matching RID
             for RID in rids:
-
                 # get the location of the record and check to see if there has been an update
                 page_range_num, page_num, offset = self.page_directory.get(RID)
                 LID = self.ranges[page_range_num].read_column(page_range_num, page_num, offset, INDIRECTION_COLUMN)
@@ -242,6 +270,7 @@ class Table:
                     page_range_num, page_num, offset = self.page_directory.get(LID)
 
                 # do the actual summing
+
                 sum += self.ranges[page_range_num].read_column(page_range_num, page_num, offset, column_number)
 
         return sum
@@ -256,13 +285,17 @@ class Table:
         RID = self.indexes[self.prim_key_col_num].locate(key)
 
         # get the location of the record
-        page_range_num, page_num, offset = self.page_directory.get(RID[0])
+        if RID:
+            page_range_num, page_num, offset = self.page_directory.get(RID[0])
 
-        # lazy delete the record
-        self.ranges[page_range_num].delete_record(page_num, offset)
+            # appending deleted RID to rid stack
+            self.rid_stack.append([RID[0], page_range_num, page_num, offset])
 
-        # modify the number of records in the table
-        self.num_records -= 1
+            # lazy delete the record
+            self.ranges[page_range_num].delete_record(page_num, offset)
+
+            # modify the number of records in the table
+            self.num_records -= 1
 
     def save_table(self, directory_name):
         """
@@ -277,8 +310,71 @@ class Table:
 
         bp.close()
 
-    def __merge(self):
-        pass
+    def __merge(self, original_page_range):
+
+        # beginning merge on this page range
+        original_page_range.merge = True
+
+        # create a copy of the page range
+        copy_page_range = original_page_range
+
+        # dictionary of RIDs we've seen so far
+        has_seen = []
+
+        # iterate through all tail pages except last, check for last update to record
+        for tail_num in range(original_page_range.last_tail_page + 1, -1, -2):
+            iterate_offset = PAGE_SIZE
+            for i in range(int(RECORDS_PER_PAGE)):
+                iterate_offset -= 8
+                # return user data and rid column
+                query_cols = [0, 1, 0, 0, 0] + ([1] * self.num_columns)
+                record = original_page_range.read_record([[original_page_range.my_index, tail_num, iterate_offset]], query_cols)[0]
+                base_rid = record.columns[0]
+                if not (base_rid in has_seen):
+                    has_seen.append(base_rid)
+
+                    _, page_num, offset = self.page_directory[base_rid]
+
+                    # TODO: clean this logic up?
+                    # ignore meta data columns and copy just the user data over
+                    for n, column in enumerate(copy_page_range.columns):
+                        if n > 4:
+                            column.update_value(page_num, offset, record.columns[n - 4])
+
+                    # TODO - double check that correct
+
+                    # edit base record's meta data columns accordingly
+                    copy_page_range.columns[SCHEMA_ENCODING_COLUMN].update_value(page_num, offset, 0)
+
+                # if have seen all rids in base pages, break since found all latest updates
+                if len(has_seen) == self.rid:
+                    break
+
+        # update last tail page
+        copy_page_range.last_tail_page = copy_page_range.columns[0].last_page - 1
+
+        # update tps of copy of page range
+        copy_page_range.tps = copy_page_range.read_column(copy_page_range.my_index, copy_page_range.columns[0].last_page - 1, PAGE_SIZE - 8,
+                                                          RID_COLUMN)
+
+        # update range and get new index to update page directory
+        self.ranges.append(copy_page_range)
+        range_index = len(self.ranges) - 1
+
+        # update page directory to point to new merged pages
+        for rid in has_seen:
+            _, page_num, offset = self.page_directory[rid]
+            values = [range_index, page_num, offset]
+            self.page_directory[rid] = values
+
+        # finished merging this page range
+        original_page_range.merge = False
+
+        # reset update counter to trigger merge
+        self.ranges[range_index].update_count = 0
+
+        # update merge count
+        self.ranges[range_index].num_merges += 1
 
 
 def get_schema_encoding(columns):

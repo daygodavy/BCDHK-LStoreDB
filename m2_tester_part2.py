@@ -28,7 +28,7 @@ for key in keys:
     print(records[key])
 
 for key in keys:
-    print("Primary key: ", key)
+    print(query.select(key, 0, [1, 1, 1, 1, 1]))
     record = query.select(key, 0, [1, 1, 1, 1, 1])[0]
     error = False
     for i, column in enumerate(record.columns):

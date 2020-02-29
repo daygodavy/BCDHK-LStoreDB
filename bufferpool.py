@@ -1,11 +1,14 @@
 import os
 from config import *
+from threading import Lock
 
 
 # we dont know either if it's page or page range
 class Bufferpool_Page:
     def __init__(self, page_range_number, page_number):
         self.dirty = False
+
+        # if True then do not evict
         self.pin = False
         self.page = None
         self.page_range_number = page_range_number
@@ -20,6 +23,7 @@ class Bufferpool:
         self.max_num_objects = 16
         self.table = None
         self.latest_obj_key = None
+        self.lock = Lock()
 
     def __get_object(self, page_range_number, page_number):
         """
@@ -47,7 +51,9 @@ class Bufferpool:
         # otherwise add a new item to the pool
         # if the pool is full evict the last item
         if len(self.pool) >= self.max_num_objects:
+            self.lock.acquire()
             self.__evict()
+            self.lock.release()
 
         # either way add the new buf_object to the pool
         buf_object = Bufferpool_Page(page_range_number, page_number)
@@ -74,18 +80,22 @@ class Bufferpool:
 
     def __evict(self):
         # get a handle on the item to evict
-        eviction_item = self.pool[-1]
+        for eviction_item in reversed(self.pool):
+           #print("Key: " + str(eviction_item.page_range_number) + ", " + str(eviction_item.page_number))
+            #print(eviction_item.pin)
+            if not eviction_item.pin:
+                break
 
         # open the file and write the contents to disk
-        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(
-            eviction_item.page_range_number) + "/" + str(eviction_item.page_number))
+        target = os.path.expanduser(self.table.directory_name + self.table.name + "/pageRange" + str(eviction_item.page_range_number) + "/" + str(eviction_item.page_number))
         file = open(target, 'wb+')
         file.write(eviction_item.page)
         file.close()
 
         # evict the item
         del self.keys[(eviction_item.page_range_number, eviction_item.page_number)]
-        del self.pool[-1]
+
+        self.pool.pop()
 
     def read(self, page_range_number, page_number, offset):
         """
@@ -129,7 +139,9 @@ class Bufferpool:
 
     def close(self):
         for i in range(len(self.pool)):
+            self.lock.acquire()
             self.__evict()
+            self.lock.release()
 
 
 bp = Bufferpool()

@@ -14,6 +14,9 @@ class Page:
         # the number of the page in the file
         self.page_number = page_number
 
+        # store TPS, if None then it's a tail page
+        self.tps = 0
+
     def has_capacity(self):
         """
         A method which checks if the page has room for another record value
@@ -40,14 +43,13 @@ class Page:
 
         :param start_index: int        # start index to start the read from
         """
-        return bp.read(page_range, page_number, start_index)
-
-        # return decode(self.data[start_index: start_index + 8])
         # TODO: TA said this error check wasn't necessary
         # if start_index < PAGE_SIZE:
         #     return decode(self.data[start_index: start_index + 8])
         # else:
         #     return print("Index Beyond Range")
+
+        return bp.read(page_range, page_number, start_index)
 
     def overwrite(self, offset, value):
         """

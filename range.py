@@ -23,7 +23,7 @@ class PageRange:
         self.num_pages = -1
 
         # the columns of the page range
-        self.columns = self.make_columns(self.num_of_columns)
+        self.columns = self.make_columns(number_of_columns=self.num_of_columns)
 
         # the number of records in the page range
         self.num_of_records = 0
@@ -32,7 +32,23 @@ class PageRange:
 
         target = directory_name + '/pageRange' + str(self.my_index)
         if not os.path.isdir(target):
+            print("New page range created")
             os.mkdir(target)
+
+        # the number of updates to the page range
+        self.update_count = 0
+
+        # want one merge to occur at once
+        self.merge = False
+
+        # merge count
+        self.num_merges = 0
+
+        # num of last tail page in prev update range
+        self.last_tail_page = 0
+
+        # tps tracks the RID of the last tail record that was applied in a merge
+        self.tps = 0
 
     def add_base_record(self, columns):
         """
@@ -47,9 +63,22 @@ class PageRange:
         page_number = 0
         offset = 0
         for i, column in enumerate(self.columns):
-            page_number, offset = column.add_base_value(self, columns[i])
+            page_number, offset = column.add_base_value(page_range=self, value=columns[i])
         self.num_of_records += 1
         return page_number, offset
+
+    def update_base_record(self, page_number, offset, columns):
+        """
+        Update an existing base record in the page range
+
+        :param page_number: int             # the page number of the record to be read
+        :param offset: int                  # the offset of the record in the page to be read
+        :param columns: []                  # a list of the values defining the record
+        """
+        for i, col in enumerate(self.columns):
+            col.update_value(page_number, offset, value=columns[i])
+
+        self.num_of_records += 1
 
     def read_record(self, locations, query_columns):
         """
@@ -65,22 +94,24 @@ class PageRange:
 
         # a list to hold the values of one record at a time
         values = []
+        returning_values = []
 
         # for each location[page_number, offset]
         for location in locations:
-
+            #print("Location: ", location)
             # for each column in the page range
             for i, _ in enumerate(self.columns):
-
+                values.append(self.read_column(location[0], location[1], location[2], column_number=i))
                 # append the record value for this column to values
                 if query_columns[i]:
-                    values.append(self.read_column(location[0], location[1], location[2], column_number=i))
+                    returning_values.append(self.read_column(location[0], location[1], location[2], column_number=i))
 
             # store the record in records
-            records.append(Record(rid=values[RID_COLUMN], key=values[self.primary_key_column], columns=values))
+            records.append(Record(rid=values[RID_COLUMN], key=values[self.primary_key_column], columns=returning_values))
 
             # reset values
             values = []
+            returning_values = []
 
         # return all the collected records from this page range
         return records
@@ -111,7 +142,9 @@ class PageRange:
         page_number = 0
         offset = 0
         for i, column in enumerate(self.columns):
-            page_number, offset = column.add_tail_value(columns[i], self)
+            page_number, offset = column.add_tail_value(value=columns[i], page_range = self)
+        self.update_count += 1
+
         return page_number, offset
 
     def delete_record(self, page_num, offset):
@@ -146,14 +179,17 @@ class PageRange:
         """
         if self.num_of_records < PAGE_RANGE_SIZE:
             return True
-        else:
-            return False
+
+        return False
+
+    def get_page_number(self):
+        self.num_pages += 1
+        return self.num_pages
 
     def make_columns(self, number_of_columns):
         """
         Make the starting empty columns for the page range
 
-        :param page_range_number:
         :param number_of_columns: int           # the number of columns in the table
 
         :return: []                             # a list of columns
@@ -163,6 +199,10 @@ class PageRange:
             columns.append(Column(column_number=i, page_range=self, page_number=self.get_page_number()))
         return columns
 
-    def get_page_number(self):
-        self.num_pages += 1
-        return self.num_pages
+    def check_threshold(self):
+        """
+        Check if we reached the update threshold and have full base pages to trigger a merge.
+        """
+        if self.update_count >= UPDATE_THRESHOLD and self.num_of_records % RECORDS_PER_PAGE == 0 and not self.merge:
+            return True
+        return False
