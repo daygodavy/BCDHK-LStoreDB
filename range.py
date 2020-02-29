@@ -32,7 +32,6 @@ class PageRange:
 
         target = directory_name + '/pageRange' + str(self.my_index)
         if not os.path.isdir(target):
-            print("New page range created")
             os.mkdir(target)
 
         # the number of updates to the page range
